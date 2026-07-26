@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sibaq '25 Result Portal | Kauthukam</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="../public/asset/5Rect.png">
+  <script src="../fest-favicon.js"></script>
+
+  <!-- Meta Tags -->
+  <meta name="description" content="Live program results, candidate toppers, team standings, and leaderboard for Sibaq '25 Result Portal.">
+
+  <!-- Typography: Clash Grotesk (Regular & Medium) -->
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600&display=swap" rel="stylesheet">
+
+  <!-- Iconify Framework -->
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+
+  <!-- Flaticon UIcons CDN -->
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.1.0/uicons-regular-rounded/css/uicons-regular-rounded.css">
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.1.0/uicons-bold-rounded/css/uicons-bold-rounded.css">
+  <link rel="stylesheet" href="https://cdn-uicons.flaticon.com/2.1.0/uicons-solid-rounded/css/uicons-solid-rounded.css">
+
+  <!-- Tailwind CSS v3 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Clash Grotesk', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- External Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans select-none relative overflow-x-hidden">
+
+  <!-- Top Header Bar -->
+  <header class="sticky top-0 z-50 top-header-glass px-6 sm:px-10 py-3 transition-all">
+    <div class="max-w-[1440px] mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Left: Logo Badge & Title -->
+      <a href="../public/index.html" class="flex items-center gap-3 group shrink-0">
+        <div class="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center border border-amber-600 p-1.5">
+          <img src="../public/asset/5Rect.png" alt="Festival Emblem" class="w-6 h-6 object-contain" data-fest="logo">
+        </div>
+        <div>
+          <div class="text-[11px] font-medium text-amber-600 leading-none uppercase tracking-wide">
+            SIBAQ <span data-fest="year-short">'25</span>
+          </div>
+          <h1 class="font-bold text-slate-900 text-base leading-tight tracking-tight mt-0.5" data-fest="name">
+            artfest
+          </h1>
+        </div>
+      </a>
+
+      <!-- Center: Search Program Input + Dropdown Pill -->
+      <div class="flex-1 max-w-xl mx-4 hidden md:flex items-center bg-white border border-slate-300 rounded-lg px-4 py-1.5 focus-within:border-slate-800 transition-all">
+        <span class="iconify text-slate-400 text-lg mr-2 shrink-0" data-icon="solar:magnifer-linear"></span>
+        <input type="text" id="search-input" placeholder="Search Program or Candidate..."
+          class="w-full bg-transparent text-xs font-normal text-slate-800 focus:outline-none placeholder:text-slate-400">
+        
+        <!-- Divider -->
+        <div class="w-[1px] h-4 bg-slate-200 mx-2.5"></div>
+
+        <!-- Filter Dropdown Trigger -->
+        <div class="relative shrink-0 flex items-center gap-1 text-xs font-semibold text-slate-700 cursor-pointer">
+          <select id="section-select" class="appearance-none bg-transparent pr-4 py-0.5 text-slate-800 font-medium focus:outline-none cursor-pointer">
+            <option value="ALL">All Sections</option>
+            <option value="BIDĀYAH">BIDĀYAH</option>
+            <option value="ŪLĀ">ŪLĀ</option>
+            <option value="THĀNIYAH">THĀNIYAH</option>
+            <option value="THĀNAWIYYAH">THĀNAWIYYAH</option>
+            <option value="ĀLIYAH">ĀLIYAH</option>
+            <option value="KULLIYYAH">KULLIYYAH</option>
+            <option value="General">General</option>
+          </select>
+          <span class="iconify text-slate-500 text-xs absolute right-0 pointer-events-none" data-icon="solar:alt-arrow-down-linear"></span>
+        </div>
+      </div>
+
+      <!-- Right: General Pill Button -->
+      <div class="flex items-center gap-3 shrink-0">
+        <a href="../public/index.html"
+          class="px-4 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 font-medium rounded-lg text-xs transition-all flex items-center gap-1.5 border border-sky-200">
+          <span>General</span>
+          <span class="iconify text-sky-600 text-sm" data-icon="solar:global-linear"></span>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Mobile Search Bar -->
+    <div class="mt-2 md:hidden flex items-center bg-white border border-slate-300 rounded-lg px-3 py-1.5">
+      <span class="iconify text-slate-400 text-base mr-2 shrink-0" data-icon="solar:magnifer-linear"></span>
+      <input type="text" id="search-input-mobile" placeholder="Search Program..."
+        class="w-full bg-transparent text-xs font-normal text-slate-800 focus:outline-none">
+    </div>
+  </header>
+
+
+  <!-- Main App Layout (Left Sidebar + Right Views) -->
+  <div class="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-grow flex flex-col md:flex-row gap-6 relative z-10">
+    
+    <!-- LEFT SIDEBAR NAV CARD -->
+    <aside class="w-full md:w-56 shrink-0">
+      <div class="sidebar-nav-card p-3 flex flex-col gap-1 sticky top-20">
+        
+        <!-- Dashboard Nav Item -->
+        <div data-nav="dashboard" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:widget-2-outline"></span>
+          <span>Dashboard</span>
+        </div>
+
+        <!-- Leaderboard Nav Item -->
+        <div data-nav="leaderboard" class="nav-item-link active">
+          <span class="iconify text-lg shrink-0" data-icon="solar:cup-star-outline"></span>
+          <span>Leaderboard</span>
+        </div>
+
+        <!-- All Results Nav Item -->
+        <div data-nav="results" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:document-text-outline"></span>
+          <span>All Results</span>
+        </div>
+
+        <!-- Candidate Profile Nav Item -->
+        <div data-nav="candidate" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:user-id-outline"></span>
+          <span>Candidate Profile</span>
+        </div>
+
+        <!-- Team Profile Nav Item -->
+        <div data-nav="institution" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:users-group-rounded-outline"></span>
+          <span>Team Profile</span>
+        </div>
+
+        <!-- Starred Programs Nav Item -->
+        <div data-nav="starred" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:star-outline"></span>
+          <span>Starred Programs</span>
+        </div>
+
+        <!-- Toppers Nav Item -->
+        <div data-nav="toppers" class="nav-item-link">
+          <span class="iconify text-lg shrink-0" data-icon="solar:medal-ribbons-star-outline"></span>
+          <span>Toppers</span>
+        </div>
+
+      </div>
+    </aside>
+
+
+    <!-- RIGHT MAIN CONTENT DISPLAY AREA -->
+    <main class="flex-1 w-full min-w-0">
+      
+      <!-- ========================================================= -->
+      <!-- SECTION A: 404 / ERROR BANNER -->
+      <!-- ========================================================= -->
+      <section id="coming-soon-section" class="hidden w-full mb-4">
+        <div id="status-404-box" class="py-2.5 px-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2">
+          <span class="iconify text-amber-600 text-base shrink-0" data-icon="solar:info-circle-linear"></span>
+          <p class="status-404-text font-medium text-slate-800 text-xs">
+            Response not successful: Received status code 404
+          </p>
+        </div>
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION B: LEADERBOARD VIEW (Image 4) -->
+      <!-- ========================================================= -->
+      <section id="view-leaderboard" class="space-y-6">
+        
+        <!-- Leaderboard Header Row + View More Pink Pill -->
+        <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center text-lg font-medium border border-purple-200">
+              <span class="iconify" data-icon="solar:cup-star-outline"></span>
+            </span>
+            <h2 class="text-2xl font-medium tracking-tight text-slate-900">
+              Leaderboard
+            </h2>
+          </div>
+          <button onclick="switchSidebarTab('toppers')"
+            class="px-4 py-1.5 bg-pink-50 hover:bg-pink-100 text-pink-700 font-medium text-xs rounded-lg border border-pink-200 transition-all flex items-center gap-1">
+            <span>View More</span>
+            <span class="iconify text-xs" data-icon="solar:alt-arrow-right-linear"></span>
+          </button>
+        </div>
+
+        <!-- Category Topper Grid Cards (BIDĀYAH, ŪLĀ, THĀNIYAH, THĀNAWIYYAH, ĀLIYAH, KULLIYYAH) -->
+        <div id="category-toppers-pill-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Rendered dynamically in script.js -->
+        </div>
+
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION C: ALL RESULTS VIEW (Image 3) -->
+      <!-- ========================================================= -->
+      <section id="view-results" class="hidden space-y-5">
+        
+        <!-- Filter Bar -->
+        <div class="content-card p-3 flex items-center justify-between gap-3 flex-wrap">
+          <div class="flex items-center gap-2">
+            <button data-tab="all" class="tab-btn active px-4 py-1.5 rounded-lg text-xs font-medium transition-all bg-sky-100 text-sky-800 border border-sky-300">All Programs</button>
+            <button data-tab="published" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-600 hover:bg-slate-100">Declared Results</button>
+          </div>
+          <span id="results-count-badge" class="text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200">0 Programs</span>
+        </div>
+
+        <!-- Dynamic Program Results Grid -->
+        <div id="programs-results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Rendered dynamically -->
+        </div>
+
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION D: CANDIDATE PROFILE VIEW (Image 5) -->
+      <!-- ========================================================= -->
+      <section id="view-candidate" class="hidden space-y-5">
+        
+        <!-- Unauthenticated Form: Dual Cards (Image 5) -->
+        <div id="cand-auth-wrapper" class="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+          
+          <!-- Left Card: Candidate Profile Branding + QR Login -->
+          <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-between text-center min-h-[380px]">
+            <div class="w-full flex flex-col items-center">
+              <!-- Central Sibaq Emblem Logo -->
+              <div class="w-16 h-16 rounded-xl bg-amber-500 flex items-center justify-center border border-amber-600 mb-3 p-2">
+                <img src="../public/asset/5Rect.png" alt="Emblem Logo" class="w-12 h-12 object-contain" data-fest="logo">
+              </div>
+
+              <!-- SIBAQ Branding -->
+              <div class="text-[11px] font-medium text-amber-600 tracking-wider uppercase bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+                SIBAQ <span data-fest="year-short">'25</span>
+              </div>
+              <h2 class="text-2xl font-medium text-slate-900 tracking-tight mt-1.5">Candidate Profile</h2>
+            </div>
+
+            <!-- Bottom QR Login Block -->
+            <div class="w-full pt-6 border-t border-slate-100 flex items-center justify-between gap-3 mt-4">
+              <div class="flex items-center gap-3 text-left">
+                <!-- QR Code Icon Box -->
+                <div class="w-11 h-11 bg-slate-900 text-white rounded-lg flex items-center justify-center shrink-0 border border-slate-800">
+                  <span class="iconify text-2xl text-amber-400" data-icon="solar:qr-code-bold"></span>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-slate-900 leading-tight">Login with your ID Card</p>
+                  <p class="text-[11px] font-normal text-slate-400 mt-0.5">Quick QR Scan</p>
+                </div>
+              </div>
+
+              <button onclick="handleQRScanTrigger()"
+                class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white font-medium text-xs rounded-lg transition-all flex items-center gap-1 shrink-0">
+                <span class="iconify text-sm" data-icon="solar:scanner-linear"></span>
+                <span>Scan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Card: Login with Chest Number & Date of Birth -->
+          <div class="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 flex flex-col justify-between min-h-[380px]">
+            <div>
+              <h3 class="text-2xl font-medium text-slate-900 tracking-tight text-center">Login</h3>
+              <p class="text-xs font-normal text-slate-500 text-center mt-1">with chest number and date of birth</p>
+
+              <!-- Connected Digit Circles (5 - 3 - 5 - 9 style) -->
+              <div class="my-6 relative">
+                <!-- Connecting Line behind circles -->
+                <div class="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-0.5 bg-slate-900 z-0"></div>
+
+                <div class="flex items-center justify-center gap-3 relative z-10">
+                  <input type="text" maxlength="1" id="cand-digit-1" value="5"
+                    class="w-10 h-10 rounded-lg bg-rose-500 text-white font-medium text-base text-center focus:outline-none focus:ring-2 focus:ring-rose-300 border border-rose-600">
+                  <input type="text" maxlength="1" id="cand-digit-2" value="3"
+                    class="w-10 h-10 rounded-lg bg-amber-500 text-white font-medium text-base text-center focus:outline-none focus:ring-2 focus:ring-amber-300 border border-amber-600">
+                  <input type="text" maxlength="1" id="cand-digit-3" value="5"
+                    class="w-10 h-10 rounded-lg bg-sky-600 text-white font-medium text-base text-center focus:outline-none focus:ring-2 focus:ring-sky-300 border border-sky-700">
+                  <input type="text" maxlength="1" id="cand-digit-4" value="9"
+                    class="w-10 h-10 rounded-lg bg-teal-600 text-white font-medium text-base text-center focus:outline-none focus:ring-2 focus:ring-teal-300 border border-teal-700">
+                </div>
+              </div>
+
+              <!-- Date of Birth Input Box with Calendar Icon -->
+              <div class="relative max-w-sm mx-auto mb-4">
+                <input type="text" id="cand-dob-input" value="31/3/2007" placeholder="DD/MM/YYYY"
+                  class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2.5 text-center text-xs font-medium text-slate-800 focus:outline-none focus:border-slate-800 transition-all">
+                <span class="iconify text-amber-500 text-lg absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" data-icon="solar:calendar-linear"></span>
+              </div>
+            </div>
+
+            <!-- Login Action Button (Soft Sky Pill) -->
+            <button id="cand-login-btn" onclick="executeCandidateLogin()"
+              class="w-full py-2.5 bg-sky-100 hover:bg-sky-200 text-sky-800 font-medium text-sm rounded-lg transition-all flex items-center justify-center gap-1.5 border border-sky-300">
+              <span class="iconify text-lg" data-icon="solar:user-bold-duotone"></span>
+              <span>Login</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Authenticated Candidate Details Panel -->
+        <div id="cand-profile-display" class="hidden content-card p-6 space-y-5">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center gap-3">
+              <div id="cand-avatar" class="w-12 h-12 rounded-xl bg-teal-50 text-teal-800 font-medium text-xl flex items-center justify-center border border-teal-200">
+                ?
+              </div>
+              <div>
+                <h3 id="cand-display-name" class="text-lg font-medium text-slate-900">Candidate Name</h3>
+                <div class="flex items-center gap-2 text-xs font-normal text-slate-500 mt-0.5">
+                  <span id="cand-display-chest" class="font-mono font-medium text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">#0000</span>
+                  <span>&bull;</span>
+                  <span id="cand-display-team" class="text-slate-700 font-medium">Team Name</span>
+                  <span>&bull;</span>
+                  <span id="cand-display-section" class="text-slate-700 font-medium">Section</span>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="logoutCandidate()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-normal rounded-lg border border-slate-200 transition-colors">
+              Change Candidate
+            </button>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Points</span>
+              <div id="cand-stat-points" class="text-2xl font-semibold text-slate-900 mt-0.5">0 PTS</div>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">1st Places</span>
+              <div id="cand-stat-wins" class="text-2xl font-semibold text-rose-600 mt-0.5">0 Wins</div>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg text-center">
+              <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Registered Events</span>
+              <div id="cand-stat-events" class="text-2xl font-semibold text-sky-600 mt-0.5">0 Events</div>
+            </div>
+          </div>
+
+          <!-- Participations & Results List -->
+          <div>
+            <h4 class="font-medium text-slate-900 text-sm mb-2.5">Event Results & Participations</h4>
+            <div id="cand-results-list" class="space-y-2.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION E: TEAM PROFILE VIEW -->
+      <!-- ========================================================= -->
+      <section id="view-institution" class="hidden space-y-5">
+        <div class="content-card p-6">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
+            <div>
+              <h3 class="text-xl font-medium text-slate-900 flex items-center gap-2">
+                <span class="iconify text-purple-700 text-xl" data-icon="solar:users-group-rounded-outline"></span>
+                <span>Team Profile & Standings</span>
+              </h3>
+              <p class="text-xs text-slate-500 font-normal mt-0.5">Overall team championship standings, wins count, and point breakdown.</p>
+            </div>
+            <span id="stat-total-points-badge" class="px-3 py-1 bg-amber-50 text-amber-900 text-xs font-medium rounded-lg border border-amber-200">
+              Total Points: 0
+            </span>
+          </div>
+
+          <!-- Team Leaderboard Cards -->
+          <div id="team-leaderboard" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <!-- Rendered dynamically in script.js -->
+          </div>
+
+          <!-- Detailed Team Breakdown -->
+          <div id="institution-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Rendered dynamically in script.js -->
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION G: STARRED PROGRAMS VIEW -->
+      <!-- ========================================================= -->
+      <section id="view-starred" class="hidden space-y-5">
+        <div class="content-card p-6">
+          <div class="border-b border-slate-100 pb-3 mb-5 flex items-center justify-between">
+            <div>
+              <h3 class="text-xl font-medium text-slate-900">Starred Programs</h3>
+              <p class="text-xs text-slate-500 font-normal mt-0.5">Your bookmarked programs for quick tracking.</p>
+            </div>
+            <span id="starred-count-badge" class="px-3 py-1 bg-amber-50 text-amber-900 text-xs font-medium rounded-lg border border-amber-200">0 Starred</span>
+          </div>
+
+          <div id="starred-programs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ========================================================= -->
+      <!-- SECTION H: TOPPERS VIEW -->
+      <!-- ========================================================= -->
+      <section id="view-toppers" class="hidden space-y-5">
+        <div class="content-card overflow-hidden">
+          <div class="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <h3 class="font-medium text-slate-900 text-base">Top Performing Candidates</h3>
+            <span class="text-xs font-medium text-pink-700 bg-pink-50 px-3 py-1 rounded-lg border border-pink-200" id="topper-count-badge">0 Candidates</span>
+          </div>
+          <div class="divide-y divide-slate-100" id="toppers-list">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Empty State Indicator -->
+      <div id="empty-state" class="hidden text-center py-12 content-card">
+        <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center mx-auto mb-2 border border-amber-200">
+          <span class="iconify text-2xl" data-icon="solar:magnifer-linear"></span>
+        </div>
+        <h4 class="text-base font-medium text-slate-900">No Results Found</h4>
+        <p class="text-xs text-slate-500 max-w-xs mx-auto mt-0.5 font-normal">Try adjusting your search terms or category selection.</p>
+      </div>
+
+    </main>
+
+  </div>
+
+
+  <!-- Program Winners Modal Popup -->
+  <div id="result-modal" class="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-200">
+    <div class="bg-white border border-slate-300 rounded-xl max-w-xl w-full p-5 transform scale-95 transition-all duration-200 relative overflow-hidden">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <span id="modal-category" class="px-2.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-900 uppercase tracking-wider mb-1 inline-block border border-amber-200">Section</span>
+          <h3 id="modal-title" class="text-lg font-medium text-slate-900 leading-tight">Program Title</h3>
+          <p id="modal-code" class="text-xs font-mono font-normal text-slate-400 mt-0.5">Code: #000</p>
+        </div>
+        <button id="modal-close" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center border border-slate-200 transition-colors">
+          <span class="iconify text-xs" data-icon="solar:close-circle-linear"></span>
+        </button>
+      </div>
+
+      <div id="modal-winners-list" class="space-y-2.5 my-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-end">
+        <button id="modal-close-btn" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-5 text-center text-xs text-slate-600 mt-auto relative z-10 font-normal">
+    <div class="max-w-[1440px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <p>&copy; <span data-fest="copyright-year">2026</span> <span data-fest="name">artfest</span> Arts Fest. All Rights Reserved.</p>
+      <div class="flex items-center gap-4">
+        <a href="../public/index.html" class="hover:text-amber-600 transition-colors">Home</a>
+        <a href="../public/downloads.html" class="hover:text-amber-600 transition-colors">Downloads</a>
+        <a href="../public/updates.html" class="hover:text-amber-600 transition-colors">Updates</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Firebase Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- Page JS Script -->
+  <script src="script.js"></script>
+
+</body>
+
+</html>

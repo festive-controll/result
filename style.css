@@ -1,0 +1,145 @@
+/* Sibaq '25 Result Portal - Ultra Minimal, Clean & Refined Flat UI */
+
+@import url('https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600&display=swap');
+
+:root {
+  --font-main: 'Clash Grotesk', 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Remove all shadows for pure minimal flat design */
+* {
+  box-shadow: none !important;
+}
+
+body {
+  font-family: var(--font-main);
+  background: #f8fafc;
+  color: #0f172a;
+  min-height: 100vh;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Hide ambient glow blobs for ultra minimal clean look */
+.glow-orb-top,
+.glow-orb-bottom {
+  display: none;
+}
+
+/* Header Glass - Minimal Flat Border */
+.top-header-glass {
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Sidebar Nav Card - Tight Border Radius & Flat Border */
+.sidebar-nav-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+/* Sidebar Links - Soft Medium Weight */
+.nav-item-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+}
+
+/* Base Nav Item Colors */
+.nav-item-link[data-nav="dashboard"] { color: #ea3650; }
+.nav-item-link[data-nav="leaderboard"] { color: #7c3aed; }
+.nav-item-link[data-nav="results"] { color: #0284c7; }
+.nav-item-link[data-nav="candidate"] { color: #0d9488; }
+.nav-item-link[data-nav="institution"],
+.nav-item-link[data-nav="team"] { color: #9333ea; }
+.nav-item-link[data-nav="starred"] { color: #ea580c; }
+.nav-item-link[data-nav="toppers"] { color: #db2777; }
+
+.nav-item-link:hover {
+  background: #f1f5f9;
+}
+
+/* Active State Minimal Flat Soft Pills with Refined Medium Weight */
+.nav-item-link.active[data-nav="dashboard"] { background: #fee2e2 !important; color: #dc2626 !important; border-color: #fca5a5 !important; font-weight: 500; }
+.nav-item-link.active[data-nav="leaderboard"] { background: #f3e8ff !important; color: #7c3aed !important; border-color: #d8b4fe !important; font-weight: 500; }
+.nav-item-link.active[data-nav="results"] { background: #e0f2fe !important; color: #0284c7 !important; border-color: #7dd3fc !important; font-weight: 500; }
+.nav-item-link.active[data-nav="candidate"] { background: #ccfbf1 !important; color: #0d9488 !important; border-color: #5eead4 !important; font-weight: 500; }
+.nav-item-link.active[data-nav="institution"],
+.nav-item-link.active[data-nav="team"] { background: #f5f0ff !important; color: #9333ea !important; border-color: #e9d5ff !important; font-weight: 500; }
+.nav-item-link.active[data-nav="starred"] { background: #ffedd5 !important; color: #ea580c !important; border-color: #fdba74 !important; font-weight: 500; }
+.nav-item-link.active[data-nav="toppers"] { background: #fce7f3 !important; color: #db2777 !important; border-color: #f9a8d4 !important; font-weight: 500; }
+
+/* Category Topper Card - Reduced Radius & Minimal Border */
+.topper-pill-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s ease;
+}
+
+.topper-pill-card:hover {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.topper-slot-pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  height: 2.75rem;
+}
+
+/* Content Card - Minimal 12px Radius & Flat Border */
+.content-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.content-card:hover {
+  border-color: #94a3b8;
+}
+
+/* Title Styling - Elegant Medium Weight */
+.vibrant-gradient-text {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+/* Candidate Profile Digit Input Circles - Clean Minimal Flat */
+#cand-digit-1, #cand-digit-2, #cand-digit-3, #cand-digit-4 {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: border-color 0.15s ease;
+}
+
+/* Status 404 Text */
+.status-404-text {
+  font-size: 0.875rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+/* Custom Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
