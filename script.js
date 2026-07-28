@@ -33,98 +33,16 @@ let starredPrograms = JSON.parse(localStorage.getItem('sibaq_starred_programs') 
 let authenticatedCandidate = null;
 let isResultPresent = true;
 
-let activeSidebarTab = 'leaderboard'; // 'dashboard', 'leaderboard', 'results', 'candidate', 'institution', 'starred', 'toppers'
+let activeSidebarTab = 'dashboard'; // 'dashboard', 'leaderboard', 'results', 'candidate', 'institution', 'starred', 'toppers'
 let activeTab = 'all'; // 'all', 'published'
 let activeSection = 'ALL'; // 'ALL', dynamic created section names
 let searchQuery = '';
+let dashboardToggleTab = 'program'; // 'program' or 'section'
 
-// Sample Fallback Data if DB is empty or loading
-const fallbackTeams = [
-  { id: 't1', name: 'Alpha Gladiators', code: 'ALG', color: '#EA8F23', points: 420, wins: 14 },
-  { id: 't2', name: 'Royal Titans', code: 'RTT', color: '#00A3E0', points: 385, wins: 11 },
-  { id: 't3', name: 'Phoenix Warriors', code: 'PHW', color: '#EA3650', points: 310, wins: 8 },
-  { id: 't4', name: 'Emerald Knights', code: 'EMK', color: '#09ABB1', points: 265, wins: 6 }
-];
-
-const fallbackCandidates = [
-  { id: 'c5359', chestNo: '5359', name: 'Muhammed Nihal', team: 'Alpha Gladiators', section: 'BIDĀYAH', dob: '31/3/2007' },
-  { id: 'c109', chestNo: '1091', name: 'Ahmad Sinan', team: 'Royal Titans', section: 'ŪLĀ', dob: '15/5/2006' },
-  { id: 'c201', chestNo: '2015', name: 'Omar Farooq', team: 'Royal Titans', section: 'THĀNIYAH', dob: '10/10/2005' },
-  { id: 'c303', chestNo: '3032', name: 'Bilal Hassan', team: 'Phoenix Warriors', section: 'THĀNAWIYYAH', dob: '04/08/2004' }
-];
-
-const fallbackPrograms = [
-  {
-    id: 'p101',
-    code: '101',
-    name: 'Elocution English',
-    category: 'BIDĀYAH',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Muhammed Nihal', candidateId: 'c5359', chestNo: '5359', team: 'Alpha Gladiators', grade: 'A', points: 10 },
-      { position: 2, candidateName: 'Ahmad Sinan', candidateId: 'c109', chestNo: '1091', team: 'Royal Titans', grade: 'A', points: 7 },
-      { position: 3, candidateName: 'Fidha Fathima', candidateId: 'c115', chestNo: '1150', team: 'Phoenix Warriors', grade: 'B', points: 5 }
-    ]
-  },
-  {
-    id: 'p102',
-    code: '102',
-    name: 'Quran Recitation',
-    category: 'ŪLĀ',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Omar Farooq', candidateId: 'c201', chestNo: '2015', team: 'Royal Titans', grade: 'A', points: 10 },
-      { position: 2, candidateName: 'Hisham Abdul', candidateId: 'c205', chestNo: '2050', team: 'Alpha Gladiators', grade: 'A', points: 7 },
-      { position: 3, candidateName: 'Zayd Rayan', candidateId: 'c212', chestNo: '2120', team: 'Emerald Knights', grade: 'A', points: 5 }
-    ]
-  },
-  {
-    id: 'p103',
-    code: '103',
-    name: 'Calligraphy Design',
-    category: 'THĀNIYAH',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Bilal Hassan', candidateId: 'c303', chestNo: '3032', team: 'Phoenix Warriors', grade: 'A', points: 10 },
-      { position: 2, candidateName: 'Hamza Malik', candidateId: 'c310', chestNo: '3100', team: 'Alpha Gladiators', grade: 'B', points: 7 },
-      { position: 3, candidateName: 'Ameen Rashad', candidateId: 'c314', chestNo: '3140', team: 'Royal Titans', grade: 'B', points: 5 }
-    ]
-  },
-  {
-    id: 'p104',
-    code: '104',
-    name: 'Essay Writing Arabic',
-    category: 'THĀNAWIYYAH',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Muhammed Nihal', candidateId: 'c5359', chestNo: '5359', team: 'Alpha Gladiators', grade: 'A', points: 10 },
-      { position: 2, candidateName: 'Salih Zakariya', candidateId: 'c315', chestNo: '3150', team: 'Emerald Knights', grade: 'A', points: 7 }
-    ]
-  },
-  {
-    id: 'p105',
-    code: '105',
-    name: 'Group Song (Folk)',
-    category: 'ĀLIYAH',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Alpha Choir Group', candidateId: 'c401', chestNo: '4010', team: 'Alpha Gladiators', grade: 'A', points: 15 },
-      { position: 2, candidateName: 'Titan Harmony', candidateId: 'c408', chestNo: '4080', team: 'Royal Titans', grade: 'A', points: 10 },
-      { position: 3, candidateName: 'Emerald Troupe', candidateId: 'c412', chestNo: '4120', team: 'Emerald Knights', grade: 'B', points: 7 }
-    ]
-  },
-  {
-    id: 'p106',
-    code: '106',
-    name: 'Islamic History Quiz',
-    category: 'KULLIYYAH',
-    isPublished: true,
-    winners: [
-      { position: 1, candidateName: 'Omar Farooq', candidateId: 'c201', chestNo: '2015', team: 'Royal Titans', grade: 'A', points: 10 },
-      { position: 2, candidateName: 'Bilal Hassan', candidateId: 'c303', chestNo: '3032', team: 'Phoenix Warriors', grade: 'B', points: 7 }
-    ]
-  }
-];
+// Fallback arrays (empty by default - data loaded strictly from DB)
+const fallbackTeams = [];
+const fallbackCandidates = [];
+const fallbackPrograms = [];
 
 // DOM Load Handler
 document.addEventListener('DOMContentLoaded', () => {
@@ -157,9 +75,9 @@ function updatePageViewState(isPresent) {
   }
 }
 
-// Auto focus movement across digit inputs (Image 5)
+// Auto focus movement across digit inputs (3 slots)
 function setupDigitInputs() {
-  const digits = ['cand-digit-1', 'cand-digit-2', 'cand-digit-3', 'cand-digit-4'];
+  const digits = ['cand-digit-1', 'cand-digit-2', 'cand-digit-3'];
   digits.forEach((id, idx) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -171,6 +89,9 @@ function setupDigitInputs() {
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Backspace' && !e.target.value && idx > 0) {
         document.getElementById(digits[idx - 1]).focus();
+      }
+      if (e.key === 'Enter') {
+        executeCandidateLogin();
       }
     });
   });
@@ -239,7 +160,7 @@ function initEventListeners() {
 }
 
 // Switch Sidebar Tab View
-window.switchSidebarTab = function(tabName) {
+window.switchSidebarTab = function (tabName) {
   activeSidebarTab = tabName;
 
   document.querySelectorAll('[data-nav]').forEach(item => {
@@ -251,17 +172,23 @@ window.switchSidebarTab = function(tabName) {
     }
   });
 
+  const secDashboard = document.getElementById('view-dashboard');
   const secLeaderboard = document.getElementById('view-leaderboard');
   const secResults = document.getElementById('view-results');
   const secCandidate = document.getElementById('view-candidate');
   const secInstitution = document.getElementById('view-institution');
   const secStarred = document.getElementById('view-starred');
   const secToppers = document.getElementById('view-toppers');
+  const secDetail = document.getElementById('view-program-detail');
+  const secSectionToppers = document.getElementById('view-section-toppers-list');
 
-  const sections = [secLeaderboard, secResults, secCandidate, secInstitution, secStarred, secToppers];
+  const sections = [secDashboard, secLeaderboard, secResults, secCandidate, secInstitution, secStarred, secToppers, secDetail, secSectionToppers];
   sections.forEach(sec => { if (sec) sec.classList.add('hidden'); });
 
-  if (tabName === 'dashboard' || tabName === 'leaderboard') {
+  if (tabName === 'dashboard') {
+    if (secDashboard) secDashboard.classList.remove('hidden');
+    renderDashboardView();
+  } else if (tabName === 'leaderboard') {
     if (secLeaderboard) secLeaderboard.classList.remove('hidden');
   } else if (tabName === 'results') {
     if (secResults) secResults.classList.remove('hidden');
@@ -284,51 +211,264 @@ window.switchSidebarTab = function(tabName) {
 // Fetch Firebase Data (Programs, Results, Teams, Candidates & Created Sections)
 function fetchResultsData() {
   if (!db) {
-    useFallbackData();
+    processDataAndRender();
     return;
   }
 
-  // Listen to created sections collection
+  // 0. Fest config listener for shutdown state
+  db.collection('config').doc('festData').onSnapshot(doc => {
+    const d = doc.exists ? doc.data() : { isActive: true, name: 'Festival' };
+    if (d.isActive === false) {
+        let overlay = document.getElementById('results-offline-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'results-offline-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:99999;background:linear-gradient(-45deg, #fdfbfb, #ffffff, #f8f9fa, #fdfbfb);background-size:400% 400%;animation:bg-pan 15s ease infinite;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;';
+            
+            const style = document.createElement('style');
+            style.id = 'results-offline-style';
+            style.innerHTML = `
+                @import url('https://api.fontshare.com/v2/css?f[]=clash-grotesk@200,300,400,500,600,700&display=swap');
+                @keyframes error-slide-up { from{opacity:0;transform:translateY(24px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+                @keyframes error-float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+                @keyframes bg-pan { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+                .error-card {
+                    background: rgba(255, 255, 255, 0.95);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(178, 230, 206, 0.6);
+                    border-radius: 40px;
+                    padding: 30px;
+                    max-width: 700px;
+                    width: calc(100% - 32px);
+                    text-align: center;
+                    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.02);
+                    animation: error-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+                    position: relative;
+                    z-index: 10;
+                    font-family: 'Clash Grotesk', sans-serif;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+
+                .error-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 16px;
+                    margin-bottom: 20px;
+                    width: 100%;
+                }
+                .error-icon-wrapper {
+                    width: 100px;
+                    height: 100px;
+                    border-radius: 50%;
+                    border: 2px solid #ffb3c6;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    flex-shrink: 0;
+                    background: #fff;
+                    animation: error-float 4s ease-in-out infinite;
+                    box-shadow: 0 12px 24px -8px rgba(242, 139, 130, 0.3);
+                }
+
+                .error-text-container {
+                    text-align: left;
+                }
+                .error-title {
+                    font-size: 46px;
+                    font-weight: normal;
+                    color: #f05a4f;
+                    margin: 0 0 8px;
+                    line-height: 1.1;
+                    letter-spacing: -1.5px;
+                    text-shadow: 0 2px 4px rgba(240, 90, 79, 0.1);
+                }
+                .error-subtitle {
+                    font-size: 26px;
+                    color: #f28b82;
+                    margin: 0;
+                    font-weight: 300;
+                    letter-spacing: -0.5px;
+                }
+
+                .error-logo-box {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 8px 16px;
+                    border: 1px solid #ffb3c6;
+                    border-radius: 16px;
+                    margin: 16px 0;
+                    background: #ffffff;
+                    box-shadow: 0 4px 12px -2px rgba(0,0,0,0.05);
+                    cursor: default;
+                }
+                .error-logo-img {
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
+                    object-fit: contain;
+                }
+                .error-logo-text {
+                    color: #2b3a67;
+                    text-align: left;
+                    line-height: 1.2;
+                }
+                .error-logo-text-title {
+                    font-size: 20px;
+                    font-weight: normal;
+                    letter-spacing: -0.5px;
+                }
+                .error-logo-text-sub {
+                    font-size: 14px;
+                    font-weight: normal;
+                    opacity: 0.7;
+                    color: #4a6fa5;
+                }
+
+                .error-footer {
+                    font-size: 16px;
+                    color: #888;
+                    margin-top: 16px;
+                    font-weight: normal;
+                }
+                .error-footer span {
+                    color: #4a6fa5;
+                    font-weight: normal;
+                    cursor: pointer;
+                }
+
+                @media (max-width: 600px) {
+                    .error-header { flex-direction: column; text-align: center; }
+                    .error-text-container { text-align: center; }
+                    .error-title { font-size: 32px; }
+                    .error-subtitle { font-size: 20px; }
+                }
+            `;
+            document.head.appendChild(style);
+
+            let errorCard = document.createElement('div');
+            errorCard.className = 'error-card';
+            errorCard.innerHTML = `
+                <div class="error-header">
+                    <div class="error-icon-wrapper">
+                        <svg viewBox="0 0 100 100" width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="15" y="25" width="70" height="50" rx="4" fill="#f8f9fa" stroke="#2b3a67" stroke-width="3"/>
+                          <line x1="15" y1="38" x2="85" y2="38" stroke="#2b3a67" stroke-width="3"/>
+                          <circle cx="23" cy="31.5" r="2.5" fill="#f05a4f"/>
+                          <circle cx="31" cy="31.5" r="2.5" fill="#f2c94c"/>
+                          <circle cx="39" cy="31.5" r="2.5" fill="#27ae60"/>
+                          <rect x="25" y="46" width="30" height="3" rx="1.5" fill="#a0aec0"/>
+                          <rect x="25" y="54" width="40" height="3" rx="1.5" fill="#a0aec0"/>
+                          <rect x="25" y="62" width="20" height="3" rx="1.5" fill="#a0aec0"/>
+                          <polygon points="55,50 35,85 75,85" fill="#f8f9fa" stroke="#2b3a67" stroke-width="3" stroke-linejoin="round"/>
+                          <polygon points="55,54 40,81 70,81" fill="#f05a4f" />
+                          <line x1="55" y1="62" x2="55" y2="72" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+                          <circle cx="55" cy="77" r="1.5" fill="#fff"/>
+                        </svg>
+                    </div>
+                    <div class="error-text-container">
+                        <h1 class="error-title">Website is Shutdown</h1>
+                        <h2 class="error-subtitle">304 - Backend De-attached</h2>
+                    </div>
+                </div>
+                
+                <div class="error-logo-box">
+                    <img class="error-logo-img" id="offline-logo-img" src="../logo-512.svg" alt="Logo">
+                    <div class="error-logo-text">
+                        <div class="error-logo-text-title" id="offline-fest-name">\${d.name || 'Festival'}</div>
+                        <div class="error-logo-text-sub">System Lockout</div>
+                    </div>
+                </div>
+
+                <div class="error-footer">
+                    contact owner is problem exists <span>dezignmvs.</span>
+                </div>
+            `;
+            overlay.appendChild(errorCard);
+            document.body.appendChild(overlay);
+        }
+    } else {
+        let overlay = document.getElementById('results-offline-overlay');
+        if (overlay) overlay.remove();
+        let style = document.getElementById('results-offline-style');
+        if (style) style.remove();
+    }
+  });
+
+  // 1. Sections Listener
   db.collection('sections').onSnapshot(secSnap => {
-    if (!secSnap.empty) {
+    if (secSnap && !secSnap.empty) {
       dbSections = secSnap.docs.map(d => d.data().name || d.data().sectionName || d.id).filter(Boolean);
+    } else {
+      dbSections = [];
     }
     renderSectionDropdown();
     renderCategoryToppersGrid();
-  }, err => console.warn("Sections snapshot fallback:", err));
+  }, err => console.warn("Sections snapshot error:", err));
 
+  // 2. Program Results Listener
   db.collection('programResults').onSnapshot(snapshot => {
     allResults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("ProgramResults snapshot error:", err));
 
-    db.collection('programs').onSnapshot(progSnap => {
-      allPrograms = progSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      db.collection('teams').onSnapshot(teamSnap => {
-        allTeams = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // 3. Programs Listener
+  db.collection('programs').onSnapshot(progSnap => {
+    allPrograms = progSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Programs snapshot error:", err));
 
-        db.collection('candidates').onSnapshot(candSnap => {
-          allCandidates = candSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  // 4. Teams Listener
+  db.collection('teams').onSnapshot(teamSnap => {
+    allTeams = teamSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Teams snapshot error:", err));
 
-          if (allPrograms.length === 0) {
-            useFallbackData();
-          } else {
-            processDataAndRender();
-          }
-        }, err => useFallbackData());
-      }, err => useFallbackData());
-    }, err => useFallbackData());
-  }, err => useFallbackData());
+  // 5. Candidates Listener
+  db.collection('candidates').onSnapshot(candSnap => {
+    allCandidates = candSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Candidates snapshot error:", err));
 }
 
 function useFallbackData() {
-  allTeams = fallbackTeams;
-  allPrograms = fallbackPrograms;
-  allCandidates = fallbackCandidates;
-  dbSections = ['BIDĀYAH', 'ŪLĀ', 'THĀNIYAH', 'THĀNAWIYYAH', 'ĀLIYAH', 'KULLIYYAH'];
   processDataAndRender();
 }
 
-// Helper: Get list of created sections only
+// Section hierarchy sorter: Bidāya -> Ūlā -> Thāniya -> Thānawiyya -> Āliya
+function getSectionHierarchyRank(secName) {
+  if (!secName) return 999;
+  const s = String(secName).toLowerCase().replace(/[\u0300-\u036f]/g, "").trim();
+
+  // Normalize macrons & diacritics
+  const norm = s
+    .replace(/ā/g, 'a')
+    .replace(/ū/g, 'u')
+    .replace(/ī/g, 'i');
+
+  if (norm.includes('bida') || norm.includes('biday')) return 1;
+  if (norm.includes('ula') || norm === 'ula') return 2;
+  if (norm.includes('thani') || norm.includes('thany') || norm.includes('thania')) return 3;
+  if (norm.includes('thanaw') || norm.includes('thanav')) return 4;
+  if (norm.includes('aliya') || norm.includes('aliay') || norm.includes('alia')) return 5;
+
+  return 10;
+}
+
+function sortSectionsByHierarchy(sections) {
+  return [...sections].sort((a, b) => {
+    const rankA = getSectionHierarchyRank(a);
+    const rankB = getSectionHierarchyRank(b);
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
+  });
+}
+
+// Helper: Get list of created sections ordered by canonical hierarchy
 function getCreatedSectionsList() {
   const sectionsSet = new Set();
 
@@ -345,23 +485,91 @@ function getCreatedSectionsList() {
     }
   });
 
-  const uniqueSections = Array.from(sectionsSet);
-  return uniqueSections.length > 0 ? uniqueSections : ['BIDĀYAH', 'ŪLĀ', 'THĀNIYAH', 'THĀNAWIYYAH', 'ĀLIYAH', 'KULLIYYAH'];
+  const list = Array.from(sectionsSet);
+  return sortSectionsByHierarchy(list);
+}
+
+function renderSectionFilterTabs() {
+  const filterContainer = document.getElementById('results-filter-tabs');
+  if (!filterContainer) return;
+
+  const sectionsList = getCreatedSectionsList();
+
+  let html = `
+    <button data-sec="ALL" class="section-tab-btn ${activeSection === 'ALL' ? 'active bg-sky-100 text-sky-800 border border-sky-300 font-bold' : 'text-slate-600 hover:bg-slate-100'} px-4 py-1.5 rounded-lg text-xs transition-all">
+      All Programs
+    </button>
+  `;
+
+  sectionsList.forEach(secName => {
+    const isActive = activeSection.toUpperCase() === secName.toUpperCase();
+    html += `
+      <button data-sec="${secName}" class="section-tab-btn ${isActive ? 'active bg-sky-100 text-sky-800 border border-sky-300 font-bold' : 'text-slate-600 hover:bg-slate-100'} px-4 py-1.5 rounded-lg text-xs transition-all">
+        ${secName}
+      </button>
+    `;
+  });
+
+  filterContainer.innerHTML = html;
+
+  filterContainer.querySelectorAll('.section-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const secVal = btn.getAttribute('data-sec');
+      activeSection = secVal;
+      renderSectionFilterTabs();
+      renderViews();
+    });
+  });
+}
+
+function getNumericPosition(r) {
+  if (!r) return 99;
+
+  if (r.position !== undefined && r.position !== null && r.position !== '' && !isNaN(parseInt(r.position))) {
+    const pos = parseInt(r.position);
+    if (pos > 0 && pos <= 50) return pos;
+  }
+
+  if (r.positionLabel && typeof r.positionLabel === 'string') {
+    const label = r.positionLabel.toLowerCase();
+    if (label.includes('1st') || label.startsWith('1')) return 1;
+    if (label.includes('2nd') || label.startsWith('2')) return 2;
+    if (label.includes('3rd') || label.startsWith('3')) return 3;
+    const match = label.match(/\d+/);
+    if (match) return parseInt(match[0]);
+  }
+
+  if (r.positionPoints !== undefined && r.positionPoints !== null) {
+    const pts = parseInt(r.positionPoints);
+    if (pts === 3) return 1;
+    if (pts === 2) return 2;
+    if (pts === 1) return 3;
+  }
+
+  return 99;
+}
+
+function parseGradeLabel(grade) {
+  if (!grade) return 'A';
+  const str = String(grade).trim();
+  const clean = str.replace(/\s*\(.*?\)/g, '').replace(/grade/i, '').trim();
+  return clean || str || 'A';
 }
 
 function processDataAndRender() {
   allPrograms.forEach(prog => {
     const matchingResults = allResults.filter(r => r.programId === prog.id || r.programCode === prog.code);
+    prog.isPublished = prog.resultsPublished === true;
+    
     if (matchingResults.length > 0) {
-      prog.isPublished = true;
       prog.winners = matchingResults.map(r => ({
-        position: parseInt(r.position) || 99,
+        position: getNumericPosition(r),
         candidateName: r.candidateName || r.name || 'Candidate',
         candidateId: r.candidateId || r.code || '',
         chestNo: r.chestNo || '',
         team: r.team || r.teamName || 'Unassigned',
-        grade: r.grade || 'A',
-        points: parseInt(r.totalPoints || r.points) || 0
+        grade: parseGradeLabel(r.gradeLabel || r.grade),
+        points: parseInt(r.totalPoints || r.points || (parseInt(r.gradePoints || 0) + parseInt(r.positionPoints || 0))) || 0
       })).sort((a, b) => a.position - b.position);
     }
   });
@@ -369,8 +577,10 @@ function processDataAndRender() {
   calculateTeamStandings();
   renderSummaryStats();
   renderSectionDropdown();
+  renderSectionFilterTabs();
   renderCategoryToppersGrid();
   renderTeamProfiles();
+  renderDashboardView();
   renderViews();
 }
 
@@ -442,111 +652,345 @@ function renderCategoryToppersGrid() {
   const createdSections = getCreatedSectionsList();
 
   container.innerHTML = createdSections.map(secName => {
-    const catProgs = allPrograms.filter(p => 
-      (p.category || p.section || '').toUpperCase() === secName.toUpperCase()
+    const catProgs = allPrograms.filter(p =>
+      p.isPublished && (p.category || p.section || '').toUpperCase() === secName.toUpperCase()
     );
-    const topWinner = catProgs.flatMap(p => p.winners || []).sort((a, b) => (b.points || 0) - (a.points || 0))[0];
+    
+    const candidateMap = {};
+    catProgs.forEach(p => {
+      if (Array.isArray(p.winners)) {
+        p.winners.forEach(w => {
+          const cKey = w.candidateName;
+          if (!candidateMap[cKey]) {
+            candidateMap[cKey] = {
+              name: w.candidateName,
+              team: w.team,
+              points: 0,
+              winnerObj: w
+            };
+          }
+          candidateMap[cKey].points += (w.points || 0);
+        });
+      }
+    });
+
+    const toppers = Object.values(candidateMap).sort((a, b) => b.points - a.points);
+    const top3 = toppers.slice(0, 3);
+    
+    let listHtml = '';
+    
+    if (top3.length > 0) {
+      listHtml = '<div class="space-y-2">';
+      top3.forEach((cand, idx) => {
+        let matchedCand = allCandidates.find(c =>
+          (c.id && c.id === cand.winnerObj?.candidateId) ||
+          (c.chestNo && String(c.chestNo) === String(cand.winnerObj?.chestNo)) ||
+          (c.name && c.name.toLowerCase() === (cand.name || '').toLowerCase())
+        );
+        let photoUrl = getCandidatePhotoUrl(cand.winnerObj, matchedCand);
+        let initials = getInitials(cand.name);
+        
+        let avatarHtml = '';
+        if (photoUrl) {
+          avatarHtml = `<img src="${photoUrl}" alt="${cand.name}" class="w-7 h-7 rounded-full border-2 border-amber-400 object-cover shrink-0 shadow-sm" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-[9px] flex items-center justify-center border-2 border-amber-400 shrink-0 shadow-sm uppercase\\'>${initials}</div>';" />`;
+        } else {
+          avatarHtml = `<div class="w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-[9px] flex items-center justify-center border-2 border-amber-400 shrink-0 shadow-sm uppercase">${initials}</div>`;
+        }
+
+        const searchArg = (cand.winnerObj?.chestNo || cand.winnerObj?.candidateId || cand.name || '').replace(/'/g, "\\'");
+        
+        let rankIcon = '';
+        if (idx === 0) rankIcon = '<span class="iconify text-amber-500 text-base shrink-0" data-icon="solar:crown-star-bold"></span>';
+        else if (idx === 1) rankIcon = '<span class="iconify text-slate-400 text-base shrink-0" data-icon="solar:medal-star-bold"></span>';
+        else if (idx === 2) rankIcon = '<span class="iconify text-amber-700 text-base shrink-0" data-icon="solar:medal-ribbons-star-bold"></span>';
+
+        listHtml += `
+          <div class="topper-slot-pill flex items-center justify-between px-3.5 py-2 hover:bg-slate-100/80 transition-colors rounded-lg cursor-pointer" onclick="openCandidateProfileByChestNo('${searchArg}')">
+            <div class="flex items-center gap-2 min-w-0">
+              ${rankIcon}
+              ${avatarHtml}
+              <span class="text-xs font-medium text-slate-900 truncate transition-colors">${cand.name}</span>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-[10px] font-normal text-slate-500 uppercase block leading-tight">${cand.team}</span>
+              <span class="text-[11px] font-medium text-amber-600 leading-tight">${cand.points} Pts</span>
+            </div>
+          </div>
+        `;
+      });
+      listHtml += '</div>';
+    } else {
+      listHtml = `<div class="topper-slot-pill flex items-center justify-center px-3.5 py-4"><span class="text-xs font-normal text-slate-400 mx-auto">Standings calculating...</span></div>`;
+    }
 
     return `
-      <div class="topper-pill-card flex flex-col justify-between cursor-pointer group"
-        onclick="switchSidebarTab('results')">
+      <div class="topper-pill-card flex flex-col justify-between group p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
         <div>
-          <h4 class="font-medium text-slate-900 text-base tracking-tight text-center mb-3 group-hover:text-amber-600 transition-colors">${secName} Toppers</h4>
-          
-          <div class="topper-slot-pill flex items-center justify-between px-3.5">
-            ${topWinner ? `
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="iconify text-amber-500 text-base shrink-0" data-icon="solar:crown-star-bold"></span>
-                <span class="text-xs font-medium text-slate-900 truncate">${topWinner.candidateName}</span>
-              </div>
-              <span class="text-[11px] font-medium text-slate-600 uppercase shrink-0">${topWinner.team}</span>
-            ` : `
-              <span class="text-xs font-normal text-slate-400 mx-auto">Standings calculating...</span>
-            `}
-          </div>
+          <h4 class="font-medium text-slate-900 text-base tracking-tight text-center mb-4">${secName} Toppers</h4>
+          ${listHtml}
         </div>
+        ${top3.length > 0 ? `
+        <button onclick="openSectionToppersList('${secName}')" class="mt-4 w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-lg border border-slate-200 transition-all flex items-center justify-center gap-1">
+          <span>View More</span>
+          <span class="iconify" data-icon="solar:alt-arrow-right-linear"></span>
+        </button>
+        ` : ''}
       </div>
     `;
   }).join('');
 }
 
-// Render Team Standings inside Team Profile Section
-function renderTeamProfiles() {
-  const leaderboardContainer = document.getElementById('team-leaderboard');
-  const detailsContainer = document.getElementById('institution-cards-container');
-
-  if (leaderboardContainer) {
-    if (allTeams.length === 0) {
-      leaderboardContainer.innerHTML = `<div class="col-span-full text-center py-4 text-slate-400 text-sm font-medium">No team standings available</div>`;
-    } else {
-      leaderboardContainer.innerHTML = allTeams.map((team, idx) => {
-        const trophyIcon = idx === 0 ? 'solar:cup-first-bold' : idx === 1 ? 'solar:medal-star-bold' : idx === 2 ? 'solar:medal-ribbon-bold' : 'solar:star-bold';
-
-        return `
-          <div class="content-card p-4 flex items-center justify-between gap-3 relative overflow-hidden">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded-lg flex items-center justify-center font-medium text-base shrink-0 border ${idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-300' : idx === 1 ? 'bg-slate-100 text-slate-700 border-slate-300' : idx === 2 ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-slate-50 text-slate-600 border-slate-200'}">
-                <span class="iconify" data-icon="${trophyIcon}"></span>
-              </div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-1">
-                  <span class="text-xs font-mono font-medium text-slate-400">#${idx + 1}</span>
-                  <h4 class="font-medium text-slate-900 text-sm truncate">${team.name}</h4>
-                </div>
-                <p class="text-[11px] font-normal text-slate-500 mt-0.5">${team.wins} Wins</p>
-              </div>
-            </div>
-            <div class="text-right shrink-0">
-              <span class="text-lg font-medium text-slate-900">${team.points}</span>
-              <span class="block text-[10px] font-medium uppercase tracking-wider text-slate-400">PTS</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+window.openSectionToppersList = function(secName) {
+  document.getElementById('view-leaderboard').classList.add('hidden');
+  const secSectionToppers = document.getElementById('view-section-toppers-list');
+  if (secSectionToppers) secSectionToppers.classList.remove('hidden');
+  
+  const titleEl = document.getElementById('section-toppers-title');
+  if (titleEl) titleEl.textContent = `${secName} Section Toppers`;
+  
+  const container = document.getElementById('section-toppers-full-list');
+  if (!container) return;
+  
+  const catProgs = allPrograms.filter(p => p.isPublished && (p.category || p.section || '').toUpperCase() === secName.toUpperCase());
+  const candidateMap = {};
+  
+  catProgs.forEach(p => {
+    if (Array.isArray(p.winners)) {
+      p.winners.forEach(w => {
+        const cKey = w.candidateName;
+        if (!candidateMap[cKey]) {
+          candidateMap[cKey] = { name: w.candidateName, team: w.team, points: 0, firstPlaces: 0, winnerObj: w };
+        }
+        candidateMap[cKey].points += (w.points || 0);
+        if (w.position === 1) candidateMap[cKey].firstPlaces += 1;
+      });
     }
-  }
+  });
 
-  if (detailsContainer) {
-    detailsContainer.innerHTML = allTeams.map((team, idx) => `
-      <div class="p-4 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <span class="w-8 h-8 rounded-lg font-medium text-xs flex items-center justify-center border ${idx === 0 ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-100 text-slate-700 border-slate-300'}">
-            #${idx + 1}
-          </span>
-          <div>
-            <h4 class="font-medium text-slate-900 text-sm">${team.name}</h4>
-            <p class="text-xs font-normal text-slate-500">Code: ${team.code} &bull; ${team.wins} Wins</p>
-          </div>
+  const toppers = Object.values(candidateMap).sort((a, b) => b.points - a.points);
+  
+  if (toppers.length === 0) {
+    container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs font-medium col-span-full">No candidates found for this section.</div>`;
+    return;
+  }
+  
+  container.innerHTML = toppers.map((cand, idx) => {
+    let matchedCand = allCandidates.find(c =>
+      (c.id && c.id === cand.winnerObj?.candidateId) ||
+      (c.chestNo && String(c.chestNo) === String(cand.winnerObj?.chestNo)) ||
+      (c.name && c.name.toLowerCase() === (cand.name || '').toLowerCase())
+    );
+    
+    const photoUrl = getCandidatePhotoUrl(cand.winnerObj, matchedCand);
+    const initials = getInitials(cand.name);
+    
+    let avatarHtml = '';
+    if (photoUrl) {
+      avatarHtml = `<img src="${photoUrl}" alt="${cand.name}" class="w-10 h-10 rounded-full border border-slate-200 object-cover shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-10 h-10 rounded-full bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center border border-slate-200 shrink-0 uppercase\\'>${initials}</div>';" />`;
+    } else {
+      avatarHtml = `<div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 font-bold text-sm flex items-center justify-center border border-slate-200 shrink-0 uppercase">${initials}</div>`;
+    }
+    
+    const rankBadgeColor = idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-200' : idx === 1 ? 'bg-slate-100 text-slate-700 border-slate-300' : idx === 2 ? 'bg-orange-100 text-orange-800 border-orange-200' : 'bg-slate-50 text-slate-500 border-slate-200';
+    const searchArg = (cand.winnerObj?.chestNo || cand.winnerObj?.candidateId || cand.name || '').replace(/'/g, "\\'");
+    
+    return `
+      <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-sm transition-shadow cursor-pointer" onclick="openCandidateProfileByChestNo('${searchArg}')">
+        <div class="w-8 h-8 rounded-lg ${rankBadgeColor} border flex items-center justify-center font-medium text-xs shrink-0">
+          #${idx + 1}
         </div>
-        <div class="text-right">
-          <span class="text-lg font-medium text-slate-900">${team.points}</span>
-          <span class="block text-[10px] font-medium uppercase text-slate-400">Total Points</span>
+        ${avatarHtml}
+        <div class="flex-1 min-w-0">
+          <h4 class="font-medium text-slate-900 text-sm truncate">${cand.name}</h4>
+          <p class="text-xs text-slate-500 truncate">${cand.team}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <div class="text-sm font-medium text-amber-600">${cand.points} pts</div>
+          ${cand.firstPlaces > 0 ? `<div class="text-[10px] font-medium text-amber-500 flex items-center gap-0.5 justify-end mt-0.5"><span class="iconify" data-icon="solar:cup-star-bold"></span> ${cand.firstPlaces} Gold</div>` : ''}
         </div>
       </div>
-    `).join('');
+    `;
+  }).join('');
+};
+
+window.closeSectionToppersList = function() {
+  const secSectionToppers = document.getElementById('view-section-toppers-list');
+  if (secSectionToppers) secSectionToppers.classList.add('hidden');
+  document.getElementById('view-leaderboard').classList.remove('hidden');
+};
+
+// Render Team Standings inside Team Profile Section (Column Table with Section Breakdown & Totals)
+function renderTeamProfiles() {
+  const leaderboardContainer = document.getElementById('team-leaderboard');
+  if (!leaderboardContainer) return;
+
+  if (!allTeams || allTeams.length === 0) {
+    leaderboardContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm font-medium bg-white border border-slate-200 rounded-2xl">No team standings available</div>`;
+    return;
+  }
+
+  const createdSections = getCreatedSectionsList();
+
+  // Calculate points per section for each team
+  const teamSectionDataMap = {};
+  allTeams.forEach(t => {
+    const tName = t.name || t.teamName;
+    teamSectionDataMap[tName] = {
+      name: tName,
+      code: t.code || tName.substring(0, 3).toUpperCase(),
+      color: t.color || '#EA8F23',
+      sectionPoints: {},
+      totalPoints: t.points || 0,
+      totalWins: t.wins || 0
+    };
+  });
+
+  allPrograms.forEach(prog => {
+    if (prog.isPublished && Array.isArray(prog.winners)) {
+      const sec = prog.category || prog.section || 'General';
+      prog.winners.forEach(w => {
+        if (!teamSectionDataMap[w.team]) {
+          teamSectionDataMap[w.team] = {
+            name: w.team,
+            code: w.team.substring(0, 3).toUpperCase(),
+            color: '#00A3E0',
+            sectionPoints: {},
+            totalPoints: 0,
+            totalWins: 0
+          };
+        }
+        if (!teamSectionDataMap[w.team].sectionPoints[sec]) {
+          teamSectionDataMap[w.team].sectionPoints[sec] = 0;
+        }
+        teamSectionDataMap[w.team].sectionPoints[sec] += (w.points || 0);
+      });
+    }
+  });
+
+  const sortedTeams = Object.values(teamSectionDataMap).sort((a, b) => b.totalPoints - a.totalPoints);
+
+  // Render Section Column Table
+  let html = `
+    <div class="w-full bg-white border border-slate-200/90 rounded-2xl shadow-sm p-5 mb-6">
+      <h4 class="text-sm font-medium text-slate-800 mb-4 flex items-center gap-2"><span class="iconify text-amber-500" data-icon="solar:chart-square-bold"></span> Points Breakdown by Section</h4>
+      <div id="team-sections-chart" class="w-full h-72"></div>
+    </div>
+    <div class="w-full overflow-x-auto bg-white border border-slate-200/90 rounded-2xl shadow-sm">
+      <table class="w-full text-left border-collapse min-w-[640px]">
+        <thead>
+          <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-medium uppercase tracking-wider">
+            <th class="py-3.5 px-4 font-medium">Rank & Team</th>
+            ${createdSections.map(sec => `<th class="py-3.5 px-3 text-center font-medium">${sec}</th>`).join('')}
+            <th class="py-3.5 px-4 text-right bg-amber-50/60 text-amber-900 font-medium">Total</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 text-xs font-medium text-slate-800">
+  `;
+
+  sortedTeams.forEach((t, idx) => {
+    const rankBadgeColor = idx === 0 ? 'bg-amber-400 text-slate-950 font-medium border-amber-500' : idx === 1 ? 'bg-slate-200 text-slate-900 border-slate-300' : idx === 2 ? 'bg-amber-700 text-white border-amber-800' : 'bg-slate-100 text-slate-600 border-slate-200';
+    const rankLabel = idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : `#${idx + 1}`;
+
+    html += `
+      <tr class="hover:bg-slate-50/80 transition-colors">
+        <td class="py-3.5 px-4">
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-md text-xs font-medium flex items-center justify-center border shrink-0 ${rankBadgeColor}">
+              ${rankLabel}
+            </span>
+            <div>
+              <h4 class="font-medium text-slate-800 text-xs sm:text-sm leading-tight">${t.name}</h4>
+              <p class="text-[11px] font-mono font-normal text-slate-400">Code: ${t.code}</p>
+            </div>
+          </div>
+        </td>
+        ${createdSections.map(sec => {
+          const pts = t.sectionPoints[sec] || 0;
+          return `<td class="py-3.5 px-3 text-center font-medium ${pts > 0 ? 'text-slate-800' : 'text-slate-300'}">${pts}</td>`;
+        }).join('')}
+        <td class="py-3.5 px-4 text-right font-medium text-xs sm:text-sm text-slate-900 bg-amber-50/30">${t.totalPoints}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  leaderboardContainer.innerHTML = html;
+
+  // Render ApexChart
+  if (typeof ApexCharts !== 'undefined' && sortedTeams.length > 0) {
+    const chartEl = document.getElementById('team-sections-chart');
+    if (chartEl) {
+      const teamNames = sortedTeams.map(t => t.name);
+      const seriesData = createdSections.map(sec => {
+        return {
+          name: sec,
+          data: sortedTeams.map(t => t.sectionPoints[sec] || 0)
+        };
+      });
+
+      const options = {
+        series: seriesData,
+        chart: {
+          type: 'bar',
+          height: 280,
+          stacked: true,
+          toolbar: { show: false },
+          fontFamily: 'inherit'
+        },
+        plotOptions: {
+          bar: { horizontal: false, borderRadius: 3, columnWidth: '35%' },
+        },
+        dataLabels: { enabled: false },
+        stroke: { width: 0 },
+        xaxis: {
+          categories: teamNames,
+          labels: { style: { colors: '#64748b', fontSize: '11px', fontWeight: 500 } }
+        },
+        yaxis: {
+          labels: { style: { colors: '#64748b', fontSize: '11px' } }
+        },
+        fill: { opacity: 1 },
+        legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px', markers: { radius: 4 } }
+      };
+
+      if (window.teamChartInstance) {
+        window.teamChartInstance.destroy();
+      }
+      window.teamChartInstance = new ApexCharts(chartEl, options);
+      window.teamChartInstance.render();
+    }
   }
 }
 
 function renderViews() {
   const programGrid = document.getElementById('programs-results-grid');
   const emptyState = document.getElementById('empty-state');
+  const countBadge = document.getElementById('results-count-badge');
 
-  if (activeSidebarTab === 'toppers') {
-    renderCandidateToppers();
+  if (activeSidebarTab !== 'results') {
+    if (emptyState) emptyState.classList.add('hidden');
+    if (activeSidebarTab === 'toppers') renderCandidateToppers();
     return;
   }
 
   if (!programGrid) return;
 
   let filtered = allPrograms.filter(prog => {
+    const isPub = prog.isPublished === true;
+    if (!isPub) return false;
+
     const progSec = (prog.category || prog.section || '').toUpperCase();
     if (activeSection !== 'ALL' && progSec !== activeSection.toUpperCase()) return false;
-    if (activeTab === 'published' && !prog.isPublished) return false;
 
     if (searchQuery) {
       const nameMatch = (prog.name || '').toLowerCase().includes(searchQuery);
       const codeMatch = (prog.code || '').toLowerCase().includes(searchQuery);
-      const winnerMatch = Array.isArray(prog.winners) && prog.winners.some(w => 
+      const winnerMatch = Array.isArray(prog.winners) && prog.winners.some(w =>
         (w.candidateName || '').toLowerCase().includes(searchQuery) ||
         (w.team || '').toLowerCase().includes(searchQuery)
       );
@@ -555,6 +999,18 @@ function renderViews() {
 
     return true;
   });
+
+  const countTextEl = document.getElementById('results-count-text');
+  if (countTextEl || countBadge) {
+    const publishedProgsCount = allPrograms.filter(p => p.isPublished === true).length;
+    const totalProgsCount = allPrograms.length;
+    const countText = totalProgsCount === 0
+      ? `-- / -- Published`
+      : `${publishedProgsCount} Published`;
+
+    if (countTextEl) countTextEl.textContent = countText;
+    else if (countBadge) countBadge.textContent = countText;
+  }
 
   if (filtered.length === 0) {
     if (emptyState) emptyState.classList.remove('hidden');
@@ -565,15 +1021,15 @@ function renderViews() {
   if (emptyState) emptyState.classList.add('hidden');
 
   programGrid.innerHTML = filtered.map(prog => {
-    const isPub = prog.isPublished;
-    const topWinner = isPub && prog.winners && prog.winners.length > 0 ? prog.winners[0] : null;
+    const isPub = prog.isPublished === true;
+    const topWinner = isPub && Array.isArray(prog.winners) && prog.winners.length > 0 ? prog.winners[0] : null;
     const isStarred = starredPrograms.includes(prog.id);
 
     return `
       <div class="content-card p-4 flex flex-col justify-between relative overflow-hidden">
         <div>
           <div class="flex items-center justify-between gap-2 mb-2.5">
-            <span class="px-2 py-0.5 rounded text-[10px] font-medium uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
+            <span class="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
               ${prog.category || prog.section || 'General'}
             </span>
             <div class="flex items-center gap-1.5">
@@ -584,31 +1040,48 @@ function renderViews() {
             </div>
           </div>
 
-          <h3 class="font-medium text-slate-900 text-base leading-snug mb-3 hover:text-amber-600 transition-colors cursor-pointer"
+          <h3 class="font-bold text-slate-900 text-base leading-snug mb-3 hover:text-amber-600 transition-colors cursor-pointer"
             onclick="openProgramModal('${prog.id}')">
             ${prog.name}
           </h3>
 
-          ${isPub && topWinner ? `
-            <div class="bg-amber-50/60 border border-amber-200 rounded-lg p-2.5 flex items-center justify-between mb-3">
-              <div class="flex items-center gap-2">
-                <span class="w-5 h-5 rounded bg-amber-200 text-amber-950 font-medium text-[11px] flex items-center justify-center shrink-0 border border-amber-300">1st</span>
-                <div>
-                  <p class="text-xs font-medium text-slate-900 leading-tight truncate max-w-[120px]">${topWinner.candidateName}</p>
-                  <p class="text-[11px] font-normal text-amber-800 leading-tight">${topWinner.team}</p>
-                </div>
-              </div>
-              <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-950 font-medium text-[10px] border border-amber-200">Grade ${topWinner.grade}</span>
+          ${isPub && Array.isArray(prog.winners) && prog.winners.length > 0 ? `
+            <div class="flex justify-center -space-x-4 mb-5 mt-3">
+              ${prog.winners.slice(0, 3).map((w, index) => {
+                let sMatchedCand = allCandidates.find(c =>
+                  (c.id && c.id === w.candidateId) ||
+                  (c.chestNo && String(c.chestNo) === String(w.chestNo)) ||
+                  (c.name && c.name.toLowerCase() === (w.candidateName || '').toLowerCase())
+                );
+                const sPhotoUrl = getCandidatePhotoUrl(w, sMatchedCand);
+                const sInitials = getInitials(w.candidateName);
+                
+                let ringClass = 'border-2 border-white';
+                if(w.position == 1) ringClass = 'border-2 border-amber-400';
+                else if(w.position == 2) ringClass = 'border-2 border-slate-300';
+                else if(w.position == 3) ringClass = 'border-2 border-amber-700/70';
+
+                const zIndex = 40 - (index * 10);
+                
+                if (sPhotoUrl) {
+                  return `<img src="${sPhotoUrl}" class="w-16 h-16 rounded-full object-cover shrink-0 ${ringClass} shadow-md relative bg-white" style="z-index: ${zIndex}" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-16 h-16 rounded-full bg-slate-100 text-slate-600 font-medium text-base flex items-center justify-center shrink-0 uppercase ${ringClass} shadow-md relative\\' style=\\'z-index: ${zIndex}\\'>${sInitials}</div>';" />`;
+                } else {
+                  return `<div class="w-16 h-16 rounded-full bg-slate-100 text-slate-600 font-medium text-base flex items-center justify-center shrink-0 uppercase ${ringClass} shadow-md relative" style="z-index: ${zIndex}">${sInitials}</div>`;
+                }
+              }).join('')}
+              ${prog.winners.length > 3 ? `<div class="w-16 h-16 rounded-full bg-slate-100 text-slate-600 font-medium text-base flex items-center justify-center shrink-0 border-2 border-white shadow-md relative" style="z-index: 10">+${prog.winners.length - 3}</div>` : ''}
             </div>
           ` : `
-            <div class="bg-slate-50 border border-dashed border-slate-200 rounded-lg p-2.5 text-center mb-3">
-              <p class="text-xs font-normal text-slate-400">Result Awaited / In Evaluation</p>
+            <div class="flex justify-center mb-5 mt-3">
+              <div class="w-16 h-16 rounded-full bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center shadow-sm">
+                 <span class="iconify text-slate-300 text-2xl" data-icon="solar:clock-circle-linear"></span>
+              </div>
             </div>
           `}
         </div>
 
         <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-          <span class="inline-flex items-center gap-1.5 text-[11px] font-medium ${isPub ? 'text-emerald-600' : 'text-amber-600'}">
+          <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold ${isPub ? 'text-emerald-600' : 'text-amber-600'}">
             <span class="w-1.5 h-1.5 rounded-full ${isPub ? 'bg-emerald-500' : 'bg-amber-500'}"></span>
             ${isPub ? 'Declared' : 'Awaited'}
           </span>
@@ -623,54 +1096,141 @@ function renderViews() {
   }).join('');
 }
 
+// React Hot Toast Notification System
+window.showToast = function (message, type = 'error') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 text-slate-800 text-xs sm:text-sm font-medium transform transition-all duration-300 translate-y-[-20px] opacity-0 scale-95 max-w-full`;
+
+  let iconHtml = '';
+  if (type === 'error') {
+    iconHtml = `
+      <div class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+        <span class="iconify text-sm" data-icon="solar:close-circle-bold"></span>
+      </div>
+    `;
+  } else if (type === 'success') {
+    iconHtml = `
+      <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+        <span class="iconify text-sm" data-icon="solar:check-circle-bold"></span>
+      </div>
+    `;
+  } else {
+    iconHtml = `
+      <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+        <span class="iconify text-sm" data-icon="solar:info-circle-bold"></span>
+      </div>
+    `;
+  }
+
+  toast.innerHTML = `
+    ${iconHtml}
+    <span class="leading-tight">${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-[-20px]', 'opacity-0', 'scale-95');
+    toast.classList.add('translate-y-0', 'opacity-100', 'scale-100');
+  });
+
+  setTimeout(() => {
+    toast.classList.remove('translate-y-0', 'opacity-100', 'scale-100');
+    toast.classList.add('translate-y-[-20px]', 'opacity-0', 'scale-95');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 300);
+  }, 3500);
+};
+
 // Toggle Star Program
-window.toggleStarProgram = function(progId) {
+window.toggleStarProgram = function (progId) {
   if (starredPrograms.includes(progId)) {
     starredPrograms = starredPrograms.filter(id => id !== progId);
+    showToast("Program removed from bookmarks", "info");
   } else {
     starredPrograms.push(progId);
+    showToast("Program bookmarked successfully", "success");
   }
   localStorage.setItem('sibaq_starred_programs', JSON.stringify(starredPrograms));
   renderViews();
   if (activeSidebarTab === 'starred') renderStarredPrograms();
 };
 
-// Candidate Profile Authentication & Display (Image 5)
-window.executeCandidateLogin = function() {
+// Candidate Profile Authentication & Display (3-digit chest number)
+window.executeCandidateLogin = function () {
+  const errEl = document.getElementById('cand-login-error');
+  if (errEl) errEl.classList.add('hidden');
+
   const d1 = (document.getElementById('cand-digit-1')?.value || '').trim();
   const d2 = (document.getElementById('cand-digit-2')?.value || '').trim();
   const d3 = (document.getElementById('cand-digit-3')?.value || '').trim();
-  const d4 = (document.getElementById('cand-digit-4')?.value || '').trim();
 
-  const enteredChest = `${d1}${d2}${d3}${d4}`;
+  const enteredChest = `${d1}${d2}${d3}`.trim();
 
-  // Find candidate by chest number or fallback dataset
+  if (!enteredChest) {
+    if (errEl) {
+      errEl.textContent = "Please enter 3-digit chest number";
+      errEl.classList.remove('hidden');
+    }
+    showToast("Please enter 3-digit chest number", "error");
+    return;
+  }
+
+  // Find candidate by chest number (matches string chestNo or numeric digits)
   const cand = allCandidates.find(c => {
-    const cChest = String(c.chestNo || c.chest || '').replace(/\D/g, '');
-    return cChest === enteredChest || String(c.chestNo || '') === enteredChest;
-  }) || (allCandidates.length > 0 ? allCandidates[0] : fallbackCandidates[0]);
+    const cChestRaw = String(c.chestNo || c.chest || '').trim();
+    const cChestNum = cChestRaw.replace(/\D/g, '');
+    const enteredNum = enteredChest.replace(/\D/g, '');
+    return cChestRaw === enteredChest || (enteredNum !== '' && cChestNum === enteredNum);
+  });
 
   if (cand) {
     authenticatedCandidate = cand;
+    if (errEl) errEl.classList.add('hidden');
+    showToast(`Logged in as ${cand.name || 'Candidate'}`, "success");
     renderAuthenticatedCandidateView(cand);
   } else {
-    alert("Candidate not found with the specified chest number.");
+    const msg = `Chest number #${enteredChest} does not exist`;
+    if (errEl) {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+    showToast(msg, "error");
   }
 };
 
-window.handleQRScanTrigger = function() {
-  const demoCand = allCandidates[0] || fallbackCandidates[0];
-  if (demoCand) {
-    authenticatedCandidate = demoCand;
-    renderAuthenticatedCandidateView(demoCand);
+window.handleQRScanTrigger = function () {
+  showToast("QR Code scanning is a coming soon feature!", "info");
+};
+
+window.logoutCandidate = function () {
+  authenticatedCandidate = null;
+  const wrapper = document.getElementById('cand-auth-wrapper');
+  const display = document.getElementById('cand-profile-display');
+  if (display) display.classList.add('hidden');
+  if (wrapper) {
+    wrapper.classList.remove('hidden');
+    wrapper.classList.remove('animate-profile-fade-in');
+    void wrapper.offsetWidth;
+    wrapper.classList.add('animate-profile-fade-in');
   }
+  showToast("Logged out successfully", "info");
 };
 
 function renderAuthenticatedCandidateView(cand) {
   const wrapper = document.getElementById('cand-auth-wrapper');
   const display = document.getElementById('cand-profile-display');
   if (wrapper) wrapper.classList.add('hidden');
-  if (display) display.classList.remove('hidden');
+  if (display) {
+    display.classList.remove('hidden');
+    display.classList.remove('animate-profile-fade-in');
+    void display.offsetWidth;
+    display.classList.add('animate-profile-fade-in');
+  }
 
   const avatar = document.getElementById('cand-avatar');
   const nameEl = document.getElementById('cand-display-name');
@@ -678,11 +1238,20 @@ function renderAuthenticatedCandidateView(cand) {
   const teamEl = document.getElementById('cand-display-team');
   const secEl = document.getElementById('cand-display-section');
 
-  if (avatar) avatar.textContent = (cand.name || 'C').charAt(0).toUpperCase();
+  const photoUrl = getCandidatePhotoUrl(cand);
+  const initials = getInitials(cand ? cand.name : '');
+
+  if (avatar) {
+    if (photoUrl) {
+      avatar.innerHTML = `<img src="${photoUrl}" alt="${cand.name || ''}" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.parentElement.innerHTML='${initials}';" />`;
+    } else {
+      avatar.textContent = initials;
+    }
+  }
   if (nameEl) nameEl.textContent = cand.name || 'Candidate Profile';
-  if (chestEl) chestEl.textContent = `#${cand.chestNo || '5359'}`;
-  if (teamEl) teamEl.textContent = cand.team || 'Alpha Gladiators';
-  if (secEl) secEl.textContent = cand.section || 'BIDĀYAH';
+  if (chestEl) chestEl.textContent = `#${cand.chestNo || ''}`;
+  if (teamEl) teamEl.textContent = cand.team || 'Unassigned';
+  if (secEl) secEl.textContent = cand.section || 'General';
 
   // Calculate results for this candidate
   let totalPts = 0;
@@ -690,52 +1259,75 @@ function renderAuthenticatedCandidateView(cand) {
   let candResults = [];
 
   allPrograms.forEach(prog => {
-    if (prog.isPublished && Array.isArray(prog.winners)) {
-      const match = prog.winners.find(w => 
-        w.candidateId === cand.id || 
-        w.chestNo === cand.chestNo || 
+    if (Array.isArray(prog.winners)) {
+      const match = prog.winners.find(w =>
+        w.candidateId === cand.id ||
+        String(w.chestNo || '') === String(cand.chestNo || '') ||
         (w.candidateName || '').toLowerCase() === (cand.name || '').toLowerCase()
       );
       if (match) {
-        totalPts += (match.points || 0);
-        if (match.position === 1) winsCount += 1;
+        if (prog.isPublished) {
+          totalPts += (match.points || 0);
+          if (match.position === 1) winsCount += 1;
+        }
         candResults.push({
           programName: prog.name,
           programCode: prog.code,
           category: prog.category || prog.section,
           position: match.position,
           grade: match.grade,
-          points: match.points
+          points: match.points,
+          isPublished: prog.isPublished === true
         });
       }
     }
   });
 
+  // Calculate total participations count for candidate
+  let totalParticipations = candResults.length;
+  if (Array.isArray(cand.programs)) {
+    totalParticipations = Math.max(totalParticipations, cand.programs.length);
+  } else if (cand.eventCount) {
+    totalParticipations = Math.max(totalParticipations, cand.eventCount);
+  }
+
   const statPts = document.getElementById('cand-stat-points');
   const statWins = document.getElementById('cand-stat-wins');
   const statEvents = document.getElementById('cand-stat-events');
+  const statPct = document.getElementById('cand-stat-percentage');
 
-  if (statPts) statPts.textContent = `${totalPts} PTS`;
-  if (statWins) statWins.textContent = `${winsCount} Wins`;
-  if (statEvents) statEvents.textContent = `${candResults.length} Events`;
+  // Calculate percentage: Total Points / Max Achievable Points (based on participations)
+  const maxPossibleMarks = totalParticipations > 0 ? totalParticipations * 8 : 0;
+  const percentageVal = maxPossibleMarks > 0 ? Math.min(100, Math.round((totalPts / maxPossibleMarks) * 100)) : 0;
+
+  if (statEvents) statEvents.textContent = `${totalParticipations} Events`;
+  if (statWins) statWins.textContent = `${winsCount} Published`;
+  if (statPts) statPts.textContent = `${totalPts} Marks`;
+  if (statPct) statPct.textContent = `${percentageVal}%`;
 
   const listContainer = document.getElementById('cand-results-list');
   if (listContainer) {
     if (candResults.length === 0) {
-      listContainer.innerHTML = `<div class="p-4 text-center bg-slate-50 border border-slate-200 rounded-lg text-slate-400 font-normal text-xs">No declared result entries found for this candidate.</div>`;
+      listContainer.innerHTML = `<div class="p-6 text-center bg-slate-50 border border-slate-200 rounded-xl text-slate-400 font-normal text-xs">No declared program results found for candidate #${cand.chestNo || ''}.</div>`;
     } else {
       listContainer.innerHTML = candResults.map(r => `
-        <div class="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
+        <div class="p-3.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
           <div>
-            <span class="text-[10px] font-medium uppercase px-2 py-0.5 bg-slate-100 text-slate-600 rounded border border-slate-200 mb-1 inline-block">${r.category}</span>
-            <h5 class="font-medium text-slate-900 text-xs">${r.programName}</h5>
+            <span class="text-[10px] font-medium uppercase px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200 mb-1 inline-block">${r.category}</span>
+            <h5 class="font-medium text-slate-900 text-xs sm:text-sm">${r.programName}</h5>
             <p class="text-[11px] font-mono font-normal text-slate-400">Code: #${r.programCode}</p>
           </div>
           <div class="text-right">
-            <span class="px-2 py-0.5 bg-amber-50 text-amber-900 font-medium text-xs rounded border border-amber-200">
-              ${r.position === 1 ? '1st Rank' : r.position === 2 ? '2nd Rank' : '3rd Rank'} (Grade ${r.grade})
-            </span>
-            <span class="block text-xs font-medium text-slate-900 mt-0.5">+${r.points} Pts</span>
+            ${r.isPublished ? `
+              <span class="px-2.5 py-0.5 bg-amber-50 text-amber-950 font-medium text-xs rounded-full border border-amber-200">
+                ${r.position === 1 ? '1st Rank' : r.position === 2 ? '2nd Rank' : '3rd Rank'} (Grade ${r.grade})
+              </span>
+              <span class="block text-xs font-medium text-slate-900 mt-1">+${r.points} Pts</span>
+            ` : `
+              <span class="px-2.5 py-0.5 bg-slate-100 text-slate-500 font-medium text-xs rounded-full border border-slate-200">
+                Result not published
+              </span>
+            `}
           </div>
         </div>
       `).join('');
@@ -743,8 +1335,15 @@ function renderAuthenticatedCandidateView(cand) {
   }
 }
 
-window.logoutCandidate = function() {
+window.logoutCandidate = function () {
   authenticatedCandidate = null;
+  const errEl = document.getElementById('cand-login-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  ['cand-digit-1', 'cand-digit-2', 'cand-digit-3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   const wrapper = document.getElementById('cand-auth-wrapper');
   const display = document.getElementById('cand-profile-display');
   if (wrapper) wrapper.classList.remove('hidden');
@@ -789,15 +1388,46 @@ function renderStarredPrograms() {
   `).join('');
 }
 
+window.openCandidateProfileByChestNo = function (candidateOrWinnerOrChest) {
+  let cand = null;
+  if (typeof candidateOrWinnerOrChest === 'object' && candidateOrWinnerOrChest !== null) {
+    cand = allCandidates.find(c =>
+      (c.id && c.id === candidateOrWinnerOrChest.candidateId) ||
+      (c.chestNo && String(c.chestNo) === String(candidateOrWinnerOrChest.chestNo)) ||
+      (c.name && c.name.toLowerCase() === (candidateOrWinnerOrChest.candidateName || candidateOrWinnerOrChest.name || '').toLowerCase())
+    ) || candidateOrWinnerOrChest;
+  } else if (candidateOrWinnerOrChest) {
+    const searchVal = String(candidateOrWinnerOrChest).trim().toLowerCase();
+    cand = allCandidates.find(c =>
+      String(c.chestNo || c.chest || '').toLowerCase() === searchVal ||
+      (c.id && c.id === searchVal) ||
+      (c.name && c.name.toLowerCase() === searchVal)
+    );
+  }
+
+  if (cand) {
+    authenticatedCandidate = cand;
+    switchSidebarTab('candidate');
+    renderAuthenticatedCandidateView(cand);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    switchSidebarTab('candidate');
+  }
+};
+
 function renderCandidateToppers() {
   const container = document.getElementById('toppers-list');
   const countBadge = document.getElementById('topper-count-badge');
   if (!container) return;
 
   const candidateMap = {};
+  const sectionCandidateMap = {};
+  const createdSections = getCreatedSectionsList();
+  createdSections.forEach(sec => sectionCandidateMap[sec.toUpperCase()] = { secName: sec, candidates: {} });
 
   allPrograms.forEach(p => {
     if (p.isPublished && Array.isArray(p.winners)) {
+      const section = (p.category || p.section || '').toUpperCase();
       p.winners.forEach(w => {
         const cKey = w.candidateName;
         if (!candidateMap[cKey]) {
@@ -805,84 +1435,271 @@ function renderCandidateToppers() {
             name: w.candidateName,
             team: w.team,
             points: 0,
-            firstPlaces: 0
+            winsCount: 0,
+            winnerObj: w
           };
         }
         candidateMap[cKey].points += (w.points || 0);
-        if (w.position === 1) candidateMap[cKey].firstPlaces += 1;
+        candidateMap[cKey].winsCount += 1;
+
+        if (sectionCandidateMap[section]) {
+          if (!sectionCandidateMap[section].candidates[cKey]) {
+            sectionCandidateMap[section].candidates[cKey] = { name: w.candidateName, team: w.team, points: 0, winnerObj: w };
+          }
+          sectionCandidateMap[section].candidates[cKey].points += (w.points || 0);
+        }
       });
     }
   });
 
-  const toppers = Object.values(candidateMap).sort((a, b) => b.points - a.points);
+  const overallToppers = Object.values(candidateMap).sort((a, b) => b.points - a.points);
 
-  if (countBadge) countBadge.textContent = `${toppers.length} Top Candidates`;
-
-  if (toppers.length === 0) {
+  if (overallToppers.length === 0) {
     container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs font-medium">No candidate results available yet.</div>`;
+    if (countBadge) countBadge.textContent = `0 Candidates`;
     return;
   }
 
-  container.innerHTML = toppers.slice(0, 15).map((cand, idx) => `
-    <div class="px-4 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors">
-      <div class="flex items-center gap-3">
-        <span class="w-6 h-6 rounded-lg font-medium text-xs flex items-center justify-center border ${idx === 0 ? 'bg-amber-500 text-white border-amber-600' : idx === 1 ? 'bg-slate-200 text-slate-800 border-slate-300' : idx === 2 ? 'bg-rose-200 text-rose-800 border-rose-300' : 'bg-slate-50 text-slate-600 border-slate-200'}">
-          #${idx + 1}
-        </span>
-        <div>
-          <h4 class="font-medium text-slate-900 text-xs">${cand.name}</h4>
-          <p class="text-[11px] text-slate-500 font-normal">${cand.team}</p>
+  const collegeTopper = overallToppers[0];
+  let matchedCand = allCandidates.find(c =>
+    (c.id && c.id === collegeTopper.winnerObj?.candidateId) ||
+    (c.chestNo && String(c.chestNo) === String(collegeTopper.winnerObj?.chestNo)) ||
+    (c.name && c.name.toLowerCase() === (collegeTopper.name || '').toLowerCase())
+  );
+
+  let totalParticipations = collegeTopper.winsCount;
+  let chestNo = collegeTopper.winnerObj?.chestNo || 'N/A';
+  let sectionName = matchedCand?.section || matchedCand?.category || collegeTopper.winnerObj?.category || 'General';
+
+  if (matchedCand) {
+    if (Array.isArray(matchedCand.programs)) totalParticipations = Math.max(totalParticipations, matchedCand.programs.length);
+    else if (matchedCand.eventCount) totalParticipations = Math.max(totalParticipations, matchedCand.eventCount);
+    if (matchedCand.chestNo) chestNo = matchedCand.chestNo;
+  }
+
+  const maxPossibleMarks = totalParticipations * 8;
+  const percentageVal = maxPossibleMarks > 0 ? Math.min(100, Math.round((collegeTopper.points / maxPossibleMarks) * 100)) : 0;
+
+  const photoUrl = getCandidatePhotoUrl(collegeTopper.winnerObj, matchedCand);
+  const initials = getInitials(collegeTopper.name);
+  let avatarHtml = photoUrl 
+    ? `<img src="${photoUrl}" alt="${collegeTopper.name}" class="w-16 h-16 rounded-full border-4 border-white shadow-sm object-cover" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-16 h-16 rounded-full bg-amber-500 text-white font-medium text-xl flex items-center justify-center border-4 border-white shadow-sm uppercase\\'>${initials}</div>';" />`
+    : `<div class="w-16 h-16 rounded-full bg-amber-500 text-white font-medium text-xl flex items-center justify-center border-4 border-white shadow-sm uppercase">${initials}</div>`;
+
+  const searchArg = (chestNo || collegeTopper.winnerObj?.candidateId || collegeTopper.name || '').replace(/'/g, "\\'");
+
+  let html = `
+    <!-- College Topper Card -->
+    <div class="bg-gradient-to-br from-amber-50/80 to-amber-100/50 border border-amber-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-center gap-5 relative overflow-hidden shadow-sm cursor-pointer group" onclick="openCandidateProfileByChestNo('${searchArg}')">
+      <div class="absolute -right-4 -top-4 opacity-10 pointer-events-none transition-transform group-hover:scale-110">
+        <span class="iconify text-8xl text-amber-500" data-icon="solar:crown-star-bold"></span>
+      </div>
+      
+      <div class="shrink-0 relative z-10">
+        ${avatarHtml}
+        <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center text-white shadow-sm">
+          <span class="iconify text-xs" data-icon="solar:star-bold"></span>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <div class="text-right">
-          <span class="text-xs font-medium text-slate-900">${cand.points}</span>
-          <span class="text-[9px] font-medium text-slate-400 uppercase block">PTS</span>
+      
+      <div class="flex-1 min-w-0 text-center sm:text-left z-10">
+        <span class="px-2 py-0.5 rounded-md bg-amber-200/50 text-amber-800 text-[9px] font-medium uppercase tracking-wider mb-1.5 inline-block">College Topper</span>
+        <h3 class="text-lg font-medium text-slate-900 truncate group-hover:text-amber-600 transition-colors">${collegeTopper.name}</h3>
+        <p class="text-xs font-normal text-slate-600 truncate mt-0.5">${collegeTopper.team} <span class="mx-1 text-slate-300">&bull;</span> ${sectionName}</p>
+        <p class="text-[11px] text-slate-500 mt-1 font-mono">Chest No: #${chestNo}</p>
+      </div>
+      
+      <div class="flex gap-4 sm:flex-col sm:gap-2 items-center sm:items-end z-10 mt-4 sm:mt-0">
+        <div class="text-center sm:text-right bg-white/80 px-3 py-1.5 rounded-xl border border-amber-100 min-w-[70px]">
+          <span class="block text-xl font-medium text-amber-600 leading-none">${collegeTopper.points}</span>
+          <span class="text-[9px] font-medium text-amber-700/70 uppercase">Total Pts</span>
+        </div>
+        <div class="text-center sm:text-right bg-white/80 px-3 py-1.5 rounded-xl border border-sky-100 min-w-[70px]">
+          <span class="block text-xl font-medium text-sky-600 leading-none">${percentageVal}%</span>
+          <span class="text-[9px] font-medium text-sky-700/70 uppercase">Score</span>
         </div>
       </div>
     </div>
-  `).join('');
+    
+    <!-- Section Toppers -->
+    <h4 class="font-medium text-slate-800 text-sm mb-4 px-1 flex items-center gap-2">
+      <span class="iconify text-slate-400" data-icon="solar:medal-star-bold"></span> Section Toppers
+    </h4>
+    <div class="space-y-3">
+  `;
+
+  let sectionTopperCount = 0;
+
+  createdSections.forEach(sec => {
+    const sectionData = sectionCandidateMap[sec.toUpperCase()];
+    
+    // Empty state for this section
+    if (!sectionData || !sectionData.candidates || Object.keys(sectionData.candidates).length === 0) {
+      html += `
+        <div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center gap-4 text-slate-400">
+          <div class="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+            <span class="iconify text-xl text-slate-300" data-icon="solar:user-block-rounded-linear"></span>
+          </div>
+          <div class="flex-1">
+            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[9px] font-medium uppercase tracking-wider mb-1 inline-block">${sec}</span>
+            <p class="text-sm font-normal text-slate-500">Not Registered</p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const secCands = Object.values(sectionData.candidates).sort((a, b) => b.points - a.points);
+    const topCand = secCands[0];
+    sectionTopperCount++;
+    
+    let sMatchedCand = allCandidates.find(c =>
+      (c.id && c.id === topCand.winnerObj?.candidateId) ||
+      (c.chestNo && String(c.chestNo) === String(topCand.winnerObj?.chestNo)) ||
+      (c.name && c.name.toLowerCase() === (topCand.name || '').toLowerCase())
+    );
+    
+    let sTotalParticipations = topCand.winsCount;
+    let sChestNo = topCand.winnerObj?.chestNo || 'N/A';
+    
+    if (sMatchedCand) {
+      if (Array.isArray(sMatchedCand.programs)) sTotalParticipations = Math.max(sTotalParticipations, sMatchedCand.programs.length);
+      else if (sMatchedCand.eventCount) sTotalParticipations = Math.max(sTotalParticipations, sMatchedCand.eventCount);
+      if (sMatchedCand.chestNo) sChestNo = sMatchedCand.chestNo;
+    }
+    
+    const sMaxPossibleMarks = sTotalParticipations * 8;
+    const sPercentageVal = sMaxPossibleMarks > 0 ? Math.min(100, Math.round((topCand.points / sMaxPossibleMarks) * 100)) : 0;
+    
+    const sPhotoUrl = getCandidatePhotoUrl(topCand.winnerObj, sMatchedCand);
+    const sInitials = getInitials(topCand.name);
+    
+    let sAvatarHtml = sPhotoUrl
+      ? `<img src="${sPhotoUrl}" alt="${topCand.name}" class="w-12 h-12 rounded-full border-2 border-slate-100 shadow-sm object-cover shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-12 h-12 rounded-full bg-slate-100 text-slate-600 font-medium text-lg flex items-center justify-center border-2 border-slate-200 shrink-0 uppercase\\'>${sInitials}</div>';" />`
+      : `<div class="w-12 h-12 rounded-full bg-slate-100 text-slate-600 font-medium text-lg flex items-center justify-center border-2 border-slate-200 shadow-sm shrink-0 uppercase">${sInitials}</div>`;
+    
+    const sSearchArg = (sChestNo || topCand.winnerObj?.candidateId || topCand.name || '').replace(/'/g, "\\'");
+
+    html += `
+      <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:shadow-sm transition-shadow cursor-pointer group" onclick="openCandidateProfileByChestNo('${sSearchArg}')">
+        <div class="flex items-center gap-4 flex-1 min-w-0">
+          ${sAvatarHtml}
+          <div class="flex-1 min-w-0">
+            <span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-medium uppercase tracking-wider mb-1 inline-block">${sec} Topper</span>
+            <h4 class="font-medium text-slate-900 text-base truncate group-hover:text-amber-600 transition-colors">${topCand.name}</h4>
+            <p class="text-xs font-normal text-slate-500 truncate mt-0.5">${topCand.team}</p>
+            <p class="text-[10px] text-slate-400 mt-0.5 font-mono">Chest No: #${sChestNo}</p>
+          </div>
+        </div>
+        
+        <div class="flex gap-6 items-center sm:justify-end mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+          <div class="text-center sm:text-right">
+            <span class="block text-xl font-medium text-amber-600 leading-none">${topCand.points}</span>
+            <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Total Pts</span>
+          </div>
+          <div class="text-center sm:text-right">
+            <span class="block text-xl font-medium text-sky-600 leading-none">${sPercentageVal}%</span>
+            <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Score</span>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  container.innerHTML = html;
+  
+  if (countBadge) countBadge.textContent = `${sectionTopperCount + 1} Toppers`;
 }
 
-window.openProgramModal = function(programId) {
+let previousActiveTabBeforeDetail = 'dashboard';
+
+window.openProgramModal = function (programId) {
   const prog = allPrograms.find(p => p.id === programId);
   if (!prog) return;
 
-  const modal = document.getElementById('result-modal');
-  const titleEl = document.getElementById('modal-title');
-  const codeEl = document.getElementById('modal-code');
-  const catEl = document.getElementById('modal-category');
-  const listEl = document.getElementById('modal-winners-list');
+  previousActiveTabBeforeDetail = activeSidebarTab;
+
+  const detailView = document.getElementById('view-program-detail');
+  if (!detailView) return;
+
+  ['view-dashboard', 'view-leaderboard', 'view-results', 'view-candidate', 'view-institution', 'view-starred', 'view-toppers', 'view-program-detail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+
+  detailView.classList.remove('hidden');
+
+  const titleEl = document.getElementById('detail-prog-title');
+  const codeEl = document.getElementById('detail-prog-code');
+  const catEl = document.getElementById('detail-prog-category');
+  const statusEl = document.getElementById('detail-prog-status-badge');
+  const listEl = document.getElementById('detail-winners-list');
 
   if (titleEl) titleEl.textContent = prog.name;
-  if (codeEl) codeEl.textContent = `Program Code: #${prog.code || prog.id}`;
+  if (codeEl) codeEl.textContent = `#${prog.code || prog.id}`;
   if (catEl) catEl.textContent = prog.category || prog.section || 'General';
+
+  if (statusEl) {
+    if (prog.isPublished) {
+      statusEl.className = "px-3.5 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 shrink-0";
+      statusEl.innerHTML = `<span class="iconify text-base" data-icon="solar:check-circle-bold"></span><span>Results Declared</span>`;
+    } else {
+      statusEl.className = "px-3.5 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1.5 shrink-0";
+      statusEl.innerHTML = `<span class="iconify text-base" data-icon="solar:clock-circle-linear"></span><span>Evaluation in Progress</span>`;
+    }
+  }
 
   if (listEl) {
     if (!prog.isPublished || !prog.winners || prog.winners.length === 0) {
       listEl.innerHTML = `
-        <div class="p-4 text-center bg-slate-50 border border-dashed border-slate-200 rounded-lg">
-          <span class="iconify text-xl text-amber-500 mb-1 inline-block" data-icon="solar:clock-circle-linear"></span>
-          <h5 class="font-medium text-slate-800 text-xs">Evaluation in Progress</h5>
-          <p class="text-[11px] text-slate-500 font-normal mt-0.5">Official results for this program have not been declared yet.</p>
+        <div class="p-8 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+          <span class="iconify text-3xl text-amber-500 mb-2 inline-block" data-icon="solar:clock-circle-linear"></span>
+          <h5 class="font-medium text-slate-800 text-sm">Evaluation in Progress</h5>
+          <p class="text-xs text-slate-500 font-normal mt-1 max-w-sm mx-auto">Official position winners for this program have not been declared yet.</p>
         </div>
       `;
     } else {
       listEl.innerHTML = prog.winners.map(w => {
+        const rankText = w.position === 1 ? '1st Rank' : w.position === 2 ? '2nd Rank' : w.position === 3 ? '3rd Rank' : `${w.position}th Rank`;
+        const rankColor = w.position === 1 ? 'bg-amber-500 text-white border-amber-600' : w.position === 2 ? 'bg-slate-700 text-white border-slate-800' : w.position === 3 ? 'bg-rose-600 text-white border-rose-700' : 'bg-slate-100 text-slate-700 border-slate-300';
+
+        const matchedCand = allCandidates.find(c =>
+          (c.id && c.id === w.candidateId) ||
+          (c.chestNo && String(c.chestNo) === String(w.chestNo)) ||
+          (c.name && c.name.toLowerCase() === (w.candidateName || '').toLowerCase())
+        );
+        const photoUrl = getCandidatePhotoUrl(w, matchedCand);
+        const initials = getInitials(w.candidateName);
+
+        let avatarHtml = '';
+        if (photoUrl) {
+          avatarHtml = `<img src="${photoUrl}" alt="${w.candidateName}" class="w-12 h-12 rounded-xl object-cover border border-amber-300 shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-12 h-12 rounded-xl bg-[#0c2f82] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase\\'>${initials}</div>';" />`;
+        } else {
+          avatarHtml = `<div class="w-12 h-12 rounded-xl bg-[#0c2f82] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase">${initials}</div>`;
+        }
+
         return `
-          <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="w-6 h-6 rounded font-medium text-xs flex items-center justify-center shrink-0 border ${w.position === 1 ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-200 text-slate-800 border-slate-300'}">
-                ${w.position === 1 ? '1st' : w.position === 2 ? '2nd' : '3rd'}
+          <div class="p-4 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <span class="px-3 py-1.5 rounded-xl font-medium text-xs flex items-center justify-center shrink-0 border shadow-sm ${rankColor}">
+                ${rankText}
               </span>
-              <div>
-                <h5 class="font-medium text-slate-900 text-xs">${w.candidateName}</h5>
-                <p class="text-[11px] font-normal text-slate-500">${w.team}</p>
+              ${avatarHtml}
+              <div class="min-w-0">
+                <h5 class="font-medium text-slate-900 text-base truncate">${w.candidateName}</h5>
+                <p class="text-xs font-normal text-slate-500 truncate">${w.team || 'Unassigned Team'} ${w.chestNo ? `(#${w.chestNo})` : ''}</p>
               </div>
             </div>
-            <div class="text-right">
-              <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-950 font-medium text-[10px] border border-amber-200">Grade ${w.grade}</span>
-              <span class="block text-[10px] font-medium text-slate-500 mt-0.5">+${w.points} Pts</span>
+
+            <div class="flex items-center gap-3 shrink-0">
+              <span class="px-3 py-1 rounded-lg bg-amber-50 text-amber-950 font-medium text-xs border border-amber-200">
+                Grade ${w.grade || 'A'}
+              </span>
+              <span class="text-sm font-medium text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm">
+                +${w.points} Pts
+              </span>
             </div>
           </div>
         `;
@@ -890,18 +1707,325 @@ window.openProgramModal = function(programId) {
     }
   }
 
-  if (modal) {
-    modal.classList.remove('opacity-0', 'pointer-events-none');
-    modal.querySelector('> div').classList.remove('scale-95');
-    modal.querySelector('> div').classList.add('scale-100');
-  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.closeProgramDetailView = function () {
+  const detailView = document.getElementById('view-program-detail');
+  if (detailView) detailView.classList.add('hidden');
+  switchSidebarTab(previousActiveTabBeforeDetail || 'dashboard');
 };
 
 function closeModal() {
-  const modal = document.getElementById('result-modal');
-  if (modal) {
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    modal.querySelector('> div').classList.remove('scale-100');
-    modal.querySelector('> div').classList.add('scale-95');
+  closeProgramDetailView();
+}
+
+// Custom Dashboard View Functions
+let activeDashboardProgramId = null;
+
+function updateDashboardHeaderInfo() {
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+
+  if (!activeDashboardProgramId && publishedProgs.length > 0) {
+    activeDashboardProgramId = publishedProgs[0].id;
+  }
+
+  const activeProg = publishedProgs.find(p => p.id === activeDashboardProgramId) || publishedProgs[0];
+
+  const progNameEl = document.getElementById('dash-program-name-text');
+  const secTextEl = document.getElementById('dash-tab-section-text');
+
+  if (activeProg) {
+    if (progNameEl) progNameEl.textContent = activeProg.name || activeProg.programName || 'Select Program';
+    if (secTextEl) secTextEl.textContent = activeProg.category || activeProg.section || 'General';
+  } else {
+    if (progNameEl) progNameEl.textContent = 'Result not published';
+    if (secTextEl) secTextEl.textContent = '-';
   }
 }
+
+window.selectDashboardProgram = function (progId) {
+  activeDashboardProgramId = progId;
+  updateDashboardHeaderInfo();
+  renderDashboardView();
+};
+
+function renderDashboardView() {
+  updateDashboardHeaderInfo();
+  renderDashboardPodium();
+  renderRecentUploadedList();
+}
+
+function getCandidatePhotoUrl(candOrWinner, matchedCand) {
+  if (!candOrWinner) return null;
+  const sources = [
+    candOrWinner.imageUrl,
+    candOrWinner.photo,
+    candOrWinner.image,
+    candOrWinner.candidatePhoto,
+    candOrWinner.photoUrl,
+    candOrWinner.avatar,
+    candOrWinner.photoURL,
+    matchedCand?.imageUrl,
+    matchedCand?.photo,
+    matchedCand?.image,
+    matchedCand?.photoUrl,
+    matchedCand?.avatar,
+    matchedCand?.photoURL
+  ];
+  return sources.find(src => src && typeof src === 'string' && src.trim() !== '') || null;
+}
+
+function getInitials(name) {
+  if (!name || name === '-' || name.trim() === '') return '--';
+  const clean = name.trim().toUpperCase();
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 2 && words[0].length > 0 && words[1].length > 0) {
+    return `${words[0][0]}${words[1][0]}`;
+  }
+  return clean.substring(0, 2);
+}
+
+function getTeamColor(teamName, winner, matchedCand) {
+  if (winner?.teamColor) return winner.teamColor;
+  if (matchedCand?.teamColor || matchedCand?.color) return matchedCand.teamColor || matchedCand.color;
+
+  if (teamName && teamName !== '-' && Array.isArray(allTeams)) {
+    const t = allTeams.find(team =>
+      (team.name && team.name.toLowerCase() === teamName.toLowerCase()) ||
+      (team.code && team.code.toLowerCase() === teamName.toLowerCase()) ||
+      (team.id && team.id === teamName)
+    );
+    if (t && (t.color || t.teamColor)) return t.color || t.teamColor;
+  }
+  return null;
+}
+
+function getTeamGradientStyle(teamName, rankPosition, winner, matchedCand) {
+  const teamColor = getTeamColor(teamName, winner, matchedCand);
+  if (teamColor && typeof teamColor === 'string' && teamColor.startsWith('#')) {
+    return `background: linear-gradient(160deg, ${teamColor} 0%, #081229 95%); border: 1.5px solid ${teamColor}88;`;
+  }
+
+  if (rankPosition === 1) {
+    return `background: linear-gradient(160deg, #1e3a8a 0%, #081229 95%); border: 1.5px solid #fbbf24;`;
+  } else if (rankPosition === 2) {
+    return `background: linear-gradient(160deg, #334155 0%, #081229 95%); border: 1.5px solid #cbd5e1;`;
+  }
+  return `background: linear-gradient(160deg, #451a03 0%, #081229 95%); border: 1.5px solid #d97706;`;
+}
+
+function getCandidateAvatarContent(winner, rankPosition) {
+  if (!winner || !winner.candidateName || winner.candidateName === '-') {
+    return `
+      <div class="w-full h-full flex items-center justify-center text-white/30 text-2xl sm:text-3xl font-medium tracking-widest">
+        --
+      </div>
+    `;
+  }
+
+  const matchedCand = allCandidates.find(c =>
+    (c.id && c.id === winner.candidateId) ||
+    (c.chestNo && String(c.chestNo) === String(winner.chestNo)) ||
+    (c.name && c.name.toLowerCase() === (winner.candidateName || '').toLowerCase())
+  );
+
+  const photoUrl = getCandidatePhotoUrl(winner, matchedCand);
+  const initials = getInitials(winner.candidateName);
+
+  const rank1Fallback = `<div class="w-full h-full flex flex-col items-center justify-center text-white font-medium"><span class="iconify text-amber-300 text-2xl sm:text-3xl mb-1" data-icon="solar:crown-bold"></span><span class="text-2xl sm:text-3xl tracking-wider leading-none uppercase font-medium">${initials}</span></div>`;
+  const rankOtherFallback = `<div class="w-full h-full flex items-center justify-center text-white text-2xl sm:text-3xl font-medium tracking-wider uppercase">${initials}</div>`;
+  const fallbackHTML = rankPosition === 1 ? rank1Fallback : rankOtherFallback;
+
+  if (photoUrl) {
+    const escapedFallback = fallbackHTML.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+    return `
+      <img src="${photoUrl}" alt="${winner.candidateName}" class="w-full h-full object-cover object-top" onerror="this.onerror=null; this.outerHTML='${escapedFallback}';" />
+    `;
+  }
+
+  if (rankPosition === 1) {
+    return `
+      <div class="w-full h-full flex flex-col items-center justify-center text-white font-medium">
+        <span class="iconify text-amber-300 text-2xl sm:text-3xl mb-1" data-icon="solar:crown-bold"></span>
+        <span class="text-2xl sm:text-3xl tracking-wider leading-none uppercase font-medium">${initials}</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="w-full h-full flex items-center justify-center text-white text-2xl sm:text-3xl font-medium tracking-wider uppercase">
+      ${initials}
+    </div>
+  `;
+}
+
+function renderDashboardPodium() {
+  const container = document.getElementById('dashboard-podium-container');
+  if (!container) return;
+
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+  const activeProg = publishedProgs.find(p => p.id === activeDashboardProgramId) || publishedProgs[0];
+
+  let winnersList = [];
+  if (activeProg && Array.isArray(activeProg.winners) && activeProg.winners.length > 0) {
+    winnersList = activeProg.winners;
+  }
+
+  if (winnersList.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full py-12 text-center text-slate-400 font-medium text-xs bg-white border border-slate-200 rounded-2xl w-full">
+        Result not published
+      </div>
+    `;
+    return;
+  }
+
+  const first = winnersList.find(w => w.position === 1) || winnersList[0];
+  const second = winnersList.find(w => w.position === 2) || winnersList[1];
+  const third = winnersList.find(w => w.position === 3) || winnersList[2];
+
+  const firstCand = allCandidates.find(c => first && ((c.id && c.id === first.candidateId) || (c.chestNo && String(c.chestNo) === String(first.chestNo)) || (c.name && c.name.toLowerCase() === (first.candidateName || '').toLowerCase())));
+  const secondCand = allCandidates.find(c => second && ((c.id && c.id === second.candidateId) || (c.chestNo && String(c.chestNo) === String(second.chestNo)) || (c.name && c.name.toLowerCase() === (second.candidateName || '').toLowerCase())));
+  const thirdCand = allCandidates.find(c => third && ((c.id && c.id === third.candidateId) || (c.chestNo && String(c.chestNo) === String(third.chestNo)) || (c.name && c.name.toLowerCase() === (third.candidateName || '').toLowerCase())));
+
+  const firstName = first ? (first.candidateName || first.name || 'Candidate') : '-';
+  const firstTeam = first ? (first.team || '') : '';
+  const firstGrade = first && first.candidateName && first.candidateName !== '-' ? (first.grade || 'A') : null;
+  const firstPts = first && first.candidateName && first.candidateName !== '-' && first.points ? first.points : null;
+
+  const secondName = second ? (second.candidateName || second.name || 'Candidate') : '-';
+  const secondTeam = second ? (second.team || '') : '';
+  const secondGrade = second && second.candidateName && second.candidateName !== '-' ? (second.grade || 'A') : null;
+  const secondPts = second && second.candidateName && second.candidateName !== '-' && second.points ? second.points : null;
+
+  const thirdName = third ? (third.candidateName || third.name || 'Candidate') : '-';
+  const thirdTeam = third ? (third.team || '') : '';
+  const thirdGrade = third && third.candidateName && third.candidateName !== '-' ? (third.grade || 'A') : null;
+  const thirdPts = third && third.candidateName && third.candidateName !== '-' && third.points ? third.points : null;
+
+  container.innerHTML = `
+    <!-- 2nd Place (Left) -->
+    <div class="flex flex-col items-center flex-1 max-w-[140px] sm:max-w-[170px]">
+      <div class="w-full h-56 sm:h-64 rounded-[2rem] flex flex-col items-center justify-center relative shadow-md overflow-hidden" style="${getTeamGradientStyle(secondTeam, 2, second, secondCand)}">
+        ${getCandidateAvatarContent(second, 2)}
+      </div>
+      <div class="px-3 py-0.5 bg-slate-200 text-slate-900 rounded-full flex items-center justify-center gap-1 font-medium text-xs border border-white shadow-sm -mt-4 z-10 shrink-0">
+        <span>2<sup>nd</sup></span>
+        ${secondGrade ? `<span class="w-1 h-1 rounded-full bg-slate-900/30"></span><span class="text-[10px] font-normal uppercase">Grade ${secondGrade}</span>` : ''}
+      </div>
+      <h4 class="font-medium text-slate-800 text-center text-xs sm:text-sm mt-2 w-full truncate" title="${secondName}">
+        ${secondName}
+      </h4>
+      <p class="text-[11px] text-slate-400 font-normal text-center w-full truncate mt-0.5">
+        ${secondTeam || '-'}${secondPts ? ` • ${secondPts} Pts` : ''}
+      </p>
+    </div>
+
+    <!-- 1st Place (Center) -->
+    <div class="flex flex-col items-center flex-1 max-w-[140px] sm:max-w-[170px]">
+      <div class="w-full h-56 sm:h-64 rounded-[2rem] flex flex-col items-center justify-center relative shadow-md overflow-hidden" style="${getTeamGradientStyle(firstTeam, 1, first, firstCand)}">
+        ${getCandidateAvatarContent(first, 1)}
+      </div>
+      <div class="px-3.5 py-0.5 bg-amber-400 text-slate-950 rounded-full flex items-center justify-center gap-1 font-medium text-xs border border-white shadow-md -mt-4 z-10 shrink-0">
+        <span>1<sup>st</sup></span>
+        ${firstGrade ? `<span class="w-1 h-1 rounded-full bg-slate-950/30"></span><span class="text-[10px] font-normal uppercase">Grade ${firstGrade}</span>` : ''}
+      </div>
+      <h4 class="font-medium text-slate-900 text-center text-xs sm:text-sm mt-2 w-full truncate" title="${firstName}">
+        ${firstName}
+      </h4>
+      <p class="text-[11px] text-slate-400 font-normal text-center w-full truncate mt-0.5">
+        ${firstTeam || '-'}${firstPts ? ` • ${firstPts} Pts` : ''}
+      </p>
+    </div>
+
+    <!-- 3rd Place (Right) -->
+    <div class="flex flex-col items-center flex-1 max-w-[140px] sm:max-w-[170px]">
+      <div class="w-full h-56 sm:h-64 rounded-[2rem] flex flex-col items-center justify-center relative shadow-md overflow-hidden" style="${getTeamGradientStyle(thirdTeam, 3, third, thirdCand)}">
+        ${getCandidateAvatarContent(third, 3)}
+      </div>
+      <div class="px-3 py-0.5 bg-amber-700 text-white rounded-full flex items-center justify-center gap-1 font-medium text-xs border border-white shadow-sm -mt-4 z-10 shrink-0">
+        <span>3<sup>rd</sup></span>
+        ${thirdGrade ? `<span class="w-1 h-1 rounded-full bg-white/30"></span><span class="text-[10px] font-normal uppercase">Grade ${thirdGrade}</span>` : ''}
+      </div>
+      <h4 class="font-medium text-slate-800 text-center text-xs sm:text-sm mt-2 w-full truncate" title="${thirdName}">
+        ${thirdName}
+      </h4>
+      <p class="text-[11px] text-slate-400 font-normal text-center w-full truncate mt-0.5">
+        ${thirdTeam || '-'}${thirdPts ? ` • ${thirdPts} Pts` : ''}
+      </p>
+    </div>
+  `;
+}
+
+function getSmallAvatar(winner, rankPos) {
+  if (!winner || !winner.candidateName || winner.candidateName === '-') {
+    return `<div class="w-6 h-6 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-[9px] font-bold text-slate-400 shrink-0">-</div>`;
+  }
+
+  const matchedCand = allCandidates.find(c =>
+    (c.id && c.id === winner.candidateId) ||
+    (c.chestNo && String(c.chestNo) === String(winner.chestNo)) ||
+    (c.name && c.name.toLowerCase() === (winner.candidateName || '').toLowerCase())
+  );
+
+  const photoUrl = getCandidatePhotoUrl(winner, matchedCand);
+  const initials = getInitials(winner.candidateName);
+
+  if (photoUrl) {
+    return `<img src="${photoUrl}" alt="${winner.candidateName}" class="w-7 h-7 rounded-full border-2 border-amber-400 object-cover shrink-0 shadow-sm" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-7 h-7 rounded-full bg-amber-500 text-white border-2 border-amber-400 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm\\'>${initials}</div>';" />`;
+  }
+
+  const bgClass = rankPos === 1 ? 'bg-amber-500 text-white border-amber-600' : rankPos === 2 ? 'bg-slate-700 text-white border-slate-800' : 'bg-amber-700 text-white border-amber-800';
+
+  return `<div class="w-7 h-7 rounded-full ${bgClass} border-2 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm">${initials}</div>`;
+}
+
+function renderRecentUploadedList() {
+  const container = document.getElementById('recent-uploaded-list');
+  if (!container) return;
+
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+
+  if (publishedProgs.length === 0) {
+    container.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs font-medium bg-white border border-slate-200 rounded-2xl">Result not published</div>`;
+    return;
+  }
+
+  container.innerHTML = publishedProgs.slice(0, 7).map(prog => {
+    const isSelected = prog.id === activeDashboardProgramId;
+    const secName = prog.category || prog.section || 'General';
+    const progCode = prog.code || prog.id || 'PRG-01';
+
+    const winners = Array.isArray(prog.winners) ? prog.winners : [];
+    const w1 = winners.find(w => w.position === 1);
+    const w2 = winners.find(w => w.position === 2);
+    const w3 = winners.find(w => w.position === 3);
+
+    return `
+      <div onclick="openProgramModal('${prog.id}')"
+        class="bg-white border-2 border-amber-400 hover:border-amber-500 rounded-2xl px-4 py-3 flex items-center justify-between transition-all cursor-pointer group shadow-sm ${isSelected ? 'bg-amber-50/10' : ''}">
+        <div>
+          <h5 class="font-bold text-amber-600 text-sm sm:text-base tracking-tight transition-colors">
+            ${prog.name || 'Program'}
+          </h5>
+          <p class="text-xs text-slate-400 font-medium mt-0.5">
+            ${secName} - ${progCode}
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1.5 shrink-0">
+            ${getSmallAvatar(w1, 1)}
+            ${getSmallAvatar(w2, 2)}
+            ${getSmallAvatar(w3, 3)}
+          </div>
+          <span class="iconify text-slate-400 text-lg font-bold group-hover:translate-x-1 transition-transform" data-icon="solar:alt-arrow-right-linear"></span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+
+

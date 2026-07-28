@@ -143,3 +143,73 @@ body {
   background: #cbd5e1;
   border-radius: 4px;
 }
+
+/* Full-Width Mobile Bottom Navigation Bar */
+#mobile-bottom-nav {
+  box-shadow: 0 -4px 24px -2px rgba(15, 23, 42, 0.08) !important;
+}
+
+.mobile-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 9999px;
+  color: #64748b;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.mobile-nav-btn .mobile-nav-label {
+  display: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Per-Tab Custom Colors for Mobile Bottom Navigation */
+.mobile-nav-btn[data-nav="dashboard"] { color: #ea3650; }
+.mobile-nav-btn[data-nav="leaderboard"] { color: #7c3aed; }
+.mobile-nav-btn[data-nav="results"] { color: #0284c7; }
+.mobile-nav-btn[data-nav="candidate"] { color: #0d9488; }
+.mobile-nav-btn[data-nav="institution"],
+.mobile-nav-btn[data-nav="team"] { color: #9333ea; }
+.mobile-nav-btn[data-nav="starred"] { color: #ea580c; }
+.mobile-nav-btn[data-nav="toppers"] { color: #db2777; }
+
+.mobile-nav-btn:hover {
+  background: #f8fafc;
+}
+
+/* Active State Minimal Flat Soft Pills Per Tab */
+.mobile-nav-btn.active[data-nav="dashboard"] { background: #fee2e2 !important; color: #dc2626 !important; border-color: #fca5a5 !important; }
+.mobile-nav-btn.active[data-nav="leaderboard"] { background: #f3e8ff !important; color: #7c3aed !important; border-color: #d8b4fe !important; }
+.mobile-nav-btn.active[data-nav="results"] { background: #e0f2fe !important; color: #0284c7 !important; border-color: #7dd3fc !important; }
+.mobile-nav-btn.active[data-nav="candidate"] { background: #ccfbf1 !important; color: #0d9488 !important; border-color: #5eead4 !important; }
+.mobile-nav-btn.active[data-nav="institution"],
+.mobile-nav-btn.active[data-nav="team"] { background: #f5f0ff !important; color: #9333ea !important; border-color: #e9d5ff !important; }
+.mobile-nav-btn.active[data-nav="starred"] { background: #ffedd5 !important; color: #ea580c !important; border-color: #fdba74 !important; }
+.mobile-nav-btn.active[data-nav="toppers"] { background: #fce7f3 !important; color: #db2777 !important; border-color: #f9a8d4 !important; }
+
+.mobile-nav-btn.active .mobile-nav-label {
+  display: inline-block !important;
+}
+
+/* Smooth Fade-In & Slide-Up Entrance Animation */
+@keyframes profileFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-profile-fade-in {
+  animation: profileFadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
