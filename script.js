@@ -25,6 +25,7 @@ if (typeof firebase !== 'undefined') {
 
 // App State
 let allPrograms = [];
+let dashboardCycleInterval = null;
 let allResults = [];
 let allTeams = [];
 let allCandidates = [];
@@ -569,7 +570,8 @@ function processDataAndRender() {
         chestNo: r.chestNo || '',
         team: r.team || r.teamName || 'Unassigned',
         grade: parseGradeLabel(r.gradeLabel || r.grade),
-        points: parseInt(r.totalPoints || r.points || (parseInt(r.gradePoints || 0) + parseInt(r.positionPoints || 0))) || 0
+        points: parseInt(r.totalPoints || r.points || (parseInt(r.gradePoints || 0) + parseInt(r.positionPoints || 0))) || 0,
+        isGroupResult: r.isGroupResult === true
       })).sort((a, b) => a.position - b.position);
     }
   });
@@ -581,6 +583,7 @@ function processDataAndRender() {
   renderCategoryToppersGrid();
   renderTeamProfiles();
   renderDashboardView();
+  startDashboardCycle();
   renderViews();
 }
 
@@ -649,7 +652,7 @@ function renderCategoryToppersGrid() {
   const container = document.getElementById('category-toppers-pill-grid');
   if (!container) return;
 
-  const createdSections = getCreatedSectionsList();
+  const createdSections = getCreatedSectionsList().filter(s => s.toUpperCase() !== 'KULLIYA');
 
   container.innerHTML = createdSections.map(secName => {
     const catProgs = allPrograms.filter(p =>
@@ -658,12 +661,25 @@ function renderCategoryToppersGrid() {
     
     const candidateMap = {};
     catProgs.forEach(p => {
+      const isKulliyaSection = secName.toUpperCase() === 'KULLIYA';
+      const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+      
+      if (isGroup && !isKulliyaSection) return; // Exclude group programs from individual toppers
       if (Array.isArray(p.winners)) {
         p.winners.forEach(w => {
-          const cKey = w.candidateName;
+          if (w.isGroupResult && !isKulliyaSection) return;
+          
+          let cKey = w.candidateName;
+          let dName = w.candidateName;
+          if (isKulliyaSection) {
+            cKey = w.team || w.candidateName || 'Unknown Team';
+            dName = w.team || w.candidateName || 'Unknown Team';
+          }
+          if (!cKey) return;
+          
           if (!candidateMap[cKey]) {
             candidateMap[cKey] = {
-              name: w.candidateName,
+              name: dName,
               team: w.team,
               points: 0,
               winnerObj: w
@@ -755,11 +771,24 @@ window.openSectionToppersList = function(secName) {
   const candidateMap = {};
   
   catProgs.forEach(p => {
+    const isKulliyaSection = secName.toUpperCase() === 'KULLIYA';
+    const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+    
+    if (isGroup && !isKulliyaSection) return;
     if (Array.isArray(p.winners)) {
       p.winners.forEach(w => {
-        const cKey = w.candidateName;
+        if (w.isGroupResult && !isKulliyaSection) return;
+        
+        let cKey = w.candidateName;
+        let dName = w.candidateName;
+        if (isKulliyaSection) {
+          cKey = w.team || w.candidateName || 'Unknown Team';
+          dName = w.team || w.candidateName || 'Unknown Team';
+        }
+        if (!cKey) return;
+        
         if (!candidateMap[cKey]) {
-          candidateMap[cKey] = { name: w.candidateName, team: w.team, points: 0, firstPlaces: 0, winnerObj: w };
+          candidateMap[cKey] = { name: dName, team: w.team, points: 0, firstPlaces: 0, winnerObj: w };
         }
         candidateMap[cKey].points += (w.points || 0);
         if (w.position === 1) candidateMap[cKey].firstPlaces += 1;
@@ -935,27 +964,62 @@ function renderTeamProfiles() {
 
       const options = {
         series: seriesData,
+        colors: ['#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6'],
         chart: {
           type: 'bar',
-          height: 280,
-          stacked: true,
+          height: 320,
+          stacked: false,
           toolbar: { show: false },
-          fontFamily: 'inherit'
+          fontFamily: 'inherit',
+          dropShadow: {
+            enabled: true,
+            top: 2,
+            left: 0,
+            blur: 4,
+            color: '#000',
+            opacity: 0.05
+          }
         },
         plotOptions: {
-          bar: { horizontal: false, borderRadius: 3, columnWidth: '35%' },
+          bar: { 
+            horizontal: false, 
+            borderRadius: 4, 
+            borderRadiusApplication: 'end',
+            columnWidth: '70%' 
+          },
         },
-        dataLabels: { enabled: false },
-        stroke: { width: 0 },
+        dataLabels: { 
+          enabled: false
+        },
+        stroke: { width: 1, colors: ['transparent'] },
         xaxis: {
           categories: teamNames,
-          labels: { style: { colors: '#64748b', fontSize: '11px', fontWeight: 500 } }
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#64748b', fontSize: '12px', fontWeight: 600 } }
         },
         yaxis: {
-          labels: { style: { colors: '#64748b', fontSize: '11px' } }
+          labels: { style: { colors: '#94a3b8', fontSize: '11px', fontWeight: 500 } }
+        },
+        grid: {
+          borderColor: '#f1f5f9',
+          strokeDashArray: 4,
+          padding: { top: 0, right: 0, bottom: 0, left: 10 }
         },
         fill: { opacity: 1 },
-        legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px', markers: { radius: 4 } }
+        legend: { 
+          position: 'top', 
+          horizontalAlign: 'right', 
+          fontSize: '12px', 
+          fontWeight: 500,
+          labels: { colors: '#475569' },
+          markers: { radius: 12, width: 10, height: 10 } 
+        },
+        tooltip: {
+          theme: 'light',
+          y: { formatter: function (val) { return val + " Pts" } },
+          style: { fontSize: '12px', fontFamily: 'inherit' }
+        }
       };
 
       if (window.teamChartInstance) {
@@ -1422,31 +1486,52 @@ function renderCandidateToppers() {
 
   const candidateMap = {};
   const sectionCandidateMap = {};
-  const createdSections = getCreatedSectionsList();
+  const createdSections = getCreatedSectionsList().filter(s => s.toUpperCase() !== 'KULLIYA');
   createdSections.forEach(sec => sectionCandidateMap[sec.toUpperCase()] = { secName: sec, candidates: {} });
 
   allPrograms.forEach(p => {
+    const section = (p.category || p.section || '').toUpperCase();
+    const isKulliyaSection = section === 'KULLIYA';
+    const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+    
     if (p.isPublished && Array.isArray(p.winners)) {
-      const section = (p.category || p.section || '').toUpperCase();
       p.winners.forEach(w => {
-        const cKey = w.candidateName;
-        if (!candidateMap[cKey]) {
-          candidateMap[cKey] = {
-            name: w.candidateName,
-            team: w.team,
-            points: 0,
-            winsCount: 0,
-            winnerObj: w
-          };
-        }
-        candidateMap[cKey].points += (w.points || 0);
-        candidateMap[cKey].winsCount += 1;
-
-        if (sectionCandidateMap[section]) {
-          if (!sectionCandidateMap[section].candidates[cKey]) {
-            sectionCandidateMap[section].candidates[cKey] = { name: w.candidateName, team: w.team, points: 0, winnerObj: w };
+        // OVERALL candidate map (exclude ALL group and kulliya)
+        if (!isGroup && !w.isGroupResult) {
+          const cKey = w.candidateName;
+          if (cKey) {
+            if (!candidateMap[cKey]) {
+              candidateMap[cKey] = {
+                name: w.candidateName,
+                team: w.team,
+                points: 0,
+                winsCount: 0,
+                winnerObj: w
+              };
+            }
+            candidateMap[cKey].points += (w.points || 0);
+            candidateMap[cKey].winsCount += 1;
           }
-          sectionCandidateMap[section].candidates[cKey].points += (w.points || 0);
+        }
+
+        // SECTION candidate map
+        if (sectionCandidateMap[section]) {
+          if (isGroup && !isKulliyaSection) return;
+          if (w.isGroupResult && !isKulliyaSection) return;
+          
+          let sKey = w.candidateName;
+          let dName = w.candidateName;
+          if (isKulliyaSection) {
+            sKey = w.team || w.candidateName || 'Unknown Team';
+            dName = w.team || w.candidateName || 'Unknown Team';
+          }
+          if (!sKey) return;
+
+          if (!sectionCandidateMap[section].candidates[sKey]) {
+            sectionCandidateMap[section].candidates[sKey] = { name: dName, team: w.team, points: 0, winsCount: 0, winnerObj: w };
+          }
+          sectionCandidateMap[section].candidates[sKey].points += (w.points || 0);
+          sectionCandidateMap[section].candidates[sKey].winsCount += 1;
         }
       });
     }
@@ -1723,6 +1808,32 @@ function closeModal() {
 // Custom Dashboard View Functions
 let activeDashboardProgramId = null;
 
+function startDashboardCycle() {
+  if (dashboardCycleInterval) clearInterval(dashboardCycleInterval);
+  dashboardCycleInterval = setInterval(() => {
+    if (activeSidebarTab !== 'dashboard') return;
+    const publishedProgs = allPrograms.filter(p => p.isPublished === true).slice(0, 7);
+    if (publishedProgs.length <= 1) return;
+    let currentIndex = publishedProgs.findIndex(p => p.id === activeDashboardProgramId);
+    let nextIndex = (currentIndex + 1) % publishedProgs.length;
+    activeDashboardProgramId = publishedProgs[nextIndex].id;
+    
+    const podiumContainer = document.getElementById('dashboard-podium-container');
+    if (podiumContainer) {
+      podiumContainer.style.transition = 'opacity 0.2s';
+      podiumContainer.style.opacity = '0.3';
+      setTimeout(() => {
+        updateDashboardHeaderInfo();
+        renderDashboardView();
+        podiumContainer.style.opacity = '1';
+      }, 200);
+    } else {
+      updateDashboardHeaderInfo();
+      renderDashboardView();
+    }
+  }, 15000);
+}
+
 function updateDashboardHeaderInfo() {
   const publishedProgs = allPrograms.filter(p => p.isPublished === true);
 
@@ -1971,14 +2082,22 @@ function getSmallAvatar(winner, rankPos) {
 
   const photoUrl = getCandidatePhotoUrl(winner, matchedCand);
   const initials = getInitials(winner.candidateName);
+  const teamColor = getTeamColor(winner.team, winner, matchedCand);
 
-  if (photoUrl) {
-    return `<img src="${photoUrl}" alt="${winner.candidateName}" class="w-7 h-7 rounded-full border-2 border-amber-400 object-cover shrink-0 shadow-sm" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-7 h-7 rounded-full bg-amber-500 text-white border-2 border-amber-400 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm\\'>${initials}</div>';" />`;
+  let styleString = '';
+  let bgClass = '';
+  if (teamColor) {
+    styleString = `background-color: ${teamColor}; border-color: ${teamColor}; color: white;`;
+  } else {
+    bgClass = rankPos === 1 ? 'bg-amber-500 text-white border-amber-600' : rankPos === 2 ? 'bg-slate-700 text-white border-slate-800' : 'bg-amber-700 text-white border-amber-800';
   }
 
-  const bgClass = rankPos === 1 ? 'bg-amber-500 text-white border-amber-600' : rankPos === 2 ? 'bg-slate-700 text-white border-slate-800' : 'bg-amber-700 text-white border-amber-800';
+  if (photoUrl) {
+    const errorHTML = `<div class=\\'w-7 h-7 rounded-full border-2 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm ${bgClass}\\' style=\\'${styleString}\\'>${initials}</div>`;
+    return `<img src="${photoUrl}" alt="${winner.candidateName}" class="w-7 h-7 rounded-full border-2 border-amber-400 object-cover shrink-0 shadow-sm" style="${styleString}" onerror="this.onerror=null; this.outerHTML='${errorHTML}';" />`;
+  }
 
-  return `<div class="w-7 h-7 rounded-full ${bgClass} border-2 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm">${initials}</div>`;
+  return `<div class="w-7 h-7 rounded-full border-2 flex items-center justify-center text-[9px] font-bold shrink-0 uppercase shadow-sm ${bgClass}" style="${styleString}">${initials}</div>`;
 }
 
 function renderRecentUploadedList() {
@@ -2006,7 +2125,7 @@ function renderRecentUploadedList() {
       <div onclick="openProgramModal('${prog.id}')"
         class="bg-white border-2 border-amber-400 hover:border-amber-500 rounded-2xl px-4 py-3 flex items-center justify-between transition-all cursor-pointer group shadow-sm ${isSelected ? 'bg-amber-50/10' : ''}">
         <div>
-          <h5 class="font-bold text-amber-600 text-sm sm:text-base tracking-tight transition-colors">
+          <h5 class="font-normal text-amber-600 text-sm sm:text-base tracking-tight transition-colors">
             ${prog.name || 'Program'}
           </h5>
           <p class="text-xs text-slate-400 font-medium mt-0.5">
