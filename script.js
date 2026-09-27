@@ -21,6 +21,9 @@ if (typeof firebase !== 'undefined') {
     firebase.initializeApp(firebaseConfig);
   }
   db = firebase.firestore();
+  try {
+    db.enablePersistence({ synchronizeTabs: true }).catch(err => console.warn("Persistence error:", err));
+  } catch (e) {}
 }
 
 // App State
@@ -37,6 +40,7 @@ let isResultPresent = true;
 let activeSidebarTab = 'dashboard'; // 'dashboard', 'leaderboard', 'results', 'candidate', 'institution', 'starred', 'toppers'
 let activeTab = 'all'; // 'all', 'published'
 let activeSection = 'ALL'; // 'ALL', dynamic created section names
+let activeProgramType = 'ARTS'; // 'ARTS' (stage + non-stage) or 'SPORTS'
 let searchQuery = '';
 let dashboardToggleTab = 'program'; // 'program' or 'section'
 
@@ -120,6 +124,22 @@ function initEventListeners() {
     sectionSelect.addEventListener('change', (e) => {
       activeSection = e.target.value;
       renderViews();
+    });
+  }
+
+  const programTypeToggle = document.getElementById('program-type-toggle');
+  if (programTypeToggle) {
+    programTypeToggle.addEventListener('click', () => {
+      activeProgramType = activeProgramType === 'ARTS' ? 'SPORTS' : 'ARTS';
+      updateProgramTypeToggle();
+      // Every aggregate must follow the same Arts/Sports scope as the result cards.
+      // Rebuild them immediately so navigating after a toggle never shows stale data.
+      calculateTeamStandings();
+      renderSummaryStats();
+      renderCategoryToppersGrid();
+      renderTeamProfiles();
+      renderCandidateToppers();
+      switchSidebarTab('dashboard');
     });
   }
 
@@ -229,7 +249,7 @@ function fetchResultsData() {
             const style = document.createElement('style');
             style.id = 'results-offline-style';
             style.innerHTML = `
-                @import url('https://api.fontshare.com/v2/css?f[]=clash-grotesk@200,300,400,500,600,700&display=swap');
+                /* Cobe font family */
                 @keyframes error-slide-up { from{opacity:0;transform:translateY(24px) scale(0.98)} to{opacity:1;transform:translateY(0) scale(1)} }
                 @keyframes error-float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
                 @keyframes bg-pan { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
@@ -247,7 +267,7 @@ function fetchResultsData() {
                     animation: error-slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
                     position: relative;
                     z-index: 10;
-                    font-family: 'Clash Grotesk', sans-serif;
+                    font-family: 'Cobe', sans-serif;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
@@ -409,6 +429,7 @@ function fetchResultsData() {
     }
     renderSectionDropdown();
     renderCategoryToppersGrid();
+    renderTeamProfiles();
   }, err => console.warn("Sections snapshot error:", err));
 
   // 2. Program Results Listener
@@ -523,6 +544,43 @@ function renderSectionFilterTabs() {
   });
 }
 
+// Resolve both current and legacy program records into the result-page groups.
+function resolveProgramVenueType(prog) {
+  const rawVenueType = [prog.venueTypeName, prog.venueType, prog.venue_type]
+    .find(value => typeof value === 'string' && value.trim());
+  const normalized = String(rawVenueType || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+
+  if (normalized.includes('sport')) return 'sports';
+  if (normalized.includes('nonstage')) return 'non-stage';
+  if (normalized === 'stage' || normalized.endsWith('stage')) return 'stage';
+
+  const code = String(prog.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (/^[A-Z]*Y\d+/.test(code)) return 'stage';
+  if (/^[A-Z]*X\d+/.test(code)) return 'non-stage';
+  return null;
+}
+
+function matchesActiveProgramType(prog) {
+  if (activeProgramType === 'ALL') return true;
+  const venueType = resolveProgramVenueType(prog);
+  if (activeProgramType === 'SPORTS') return venueType === 'sports';
+  return activeProgramType === 'ARTS' && (venueType === 'stage' || venueType === 'non-stage');
+}
+
+function updateProgramTypeToggle() {
+  const button = document.getElementById('program-type-toggle');
+  const label = document.getElementById('program-type-label');
+  const icon = document.getElementById('program-type-icon');
+  const isSports = activeProgramType === 'SPORTS';
+
+  if (label) label.textContent = isSports ? 'Sports' : 'Arts';
+  if (icon) icon.setAttribute('data-icon', isSports ? 'solar:football-outline' : 'solar:palette-outline');
+  if (button) {
+    button.setAttribute('data-program-type', isSports ? 'SPORTS' : 'ARTS');
+    button.setAttribute('aria-label', `Showing ${isSports ? 'Sports' : 'Arts'} results; click for ${isSports ? 'Arts' : 'Sports'}`);
+  }
+}
+
 function getNumericPosition(r) {
   if (!r) return 99;
 
@@ -595,20 +653,20 @@ function calculateTeamStandings() {
     teamMap[tName] = {
       name: tName,
       code: t.code || tName.substring(0, 3).toUpperCase(),
-      color: t.color || '#EA8F23',
+      color: t.color || '#C0912B',
       points: 0,
       wins: 0
     };
   });
 
-  allPrograms.forEach(prog => {
+  allPrograms.filter(matchesActiveProgramType).forEach(prog => {
     if (prog.isPublished && Array.isArray(prog.winners)) {
       prog.winners.forEach(w => {
         if (!teamMap[w.team]) {
           teamMap[w.team] = {
             name: w.team,
             code: w.team.substring(0, 3).toUpperCase(),
-            color: '#00A3E0',
+            color: '#17635F',
             points: 0,
             wins: 0
           };
@@ -656,7 +714,8 @@ function renderCategoryToppersGrid() {
 
   container.innerHTML = createdSections.map(secName => {
     const catProgs = allPrograms.filter(p =>
-      p.isPublished && (p.category || p.section || '').toUpperCase() === secName.toUpperCase()
+      p.isPublished && matchesActiveProgramType(p) &&
+      (p.category || p.section || '').toUpperCase() === secName.toUpperCase()
     );
     
     const candidateMap = {};
@@ -767,7 +826,10 @@ window.openSectionToppersList = function(secName) {
   const container = document.getElementById('section-toppers-full-list');
   if (!container) return;
   
-  const catProgs = allPrograms.filter(p => p.isPublished && (p.category || p.section || '').toUpperCase() === secName.toUpperCase());
+  const catProgs = allPrograms.filter(p =>
+    p.isPublished && matchesActiveProgramType(p) &&
+    (p.category || p.section || '').toUpperCase() === secName.toUpperCase()
+  );
   const candidateMap = {};
   
   catProgs.forEach(p => {
@@ -848,68 +910,117 @@ window.closeSectionToppersList = function() {
   document.getElementById('view-leaderboard').classList.remove('hidden');
 };
 
-// Render Team Standings inside Team Profile Section (Column Table with Section Breakdown & Totals)
+// Render Team Standings inside Team Profile Section (Column Table with VenueType Breakdown & Totals)
 function renderTeamProfiles() {
   const leaderboardContainer = document.getElementById('team-leaderboard');
   if (!leaderboardContainer) return;
+  const isSportsView = activeProgramType === 'SPORTS';
+  const standingsSections = getCreatedSectionsList();
 
   if (!allTeams || allTeams.length === 0) {
     leaderboardContainer.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm font-medium bg-white border border-slate-200 rounded-2xl">No team standings available</div>`;
     return;
   }
 
-  const createdSections = getCreatedSectionsList();
-
-  // Calculate points per section for each team
+  // Calculate points by Venue Type for each team
   const teamSectionDataMap = {};
   allTeams.forEach(t => {
     const tName = t.name || t.teamName;
     teamSectionDataMap[tName] = {
       name: tName,
       code: t.code || tName.substring(0, 3).toUpperCase(),
-      color: t.color || '#EA8F23',
+      color: t.color || '#C0912B',
+      points_stage: 0,
+      points_nonstage: 0,
+      points_sports: 0,
       sectionPoints: {},
       totalPoints: t.points || 0,
       totalWins: t.wins || 0
     };
   });
 
-  allPrograms.forEach(prog => {
+  allPrograms.filter(matchesActiveProgramType).forEach(prog => {
     if (prog.isPublished && Array.isArray(prog.winners)) {
-      const sec = prog.category || prog.section || 'General';
+      const detectedType = resolveProgramVenueType(prog);
       prog.winners.forEach(w => {
         if (!teamSectionDataMap[w.team]) {
           teamSectionDataMap[w.team] = {
             name: w.team,
             code: w.team.substring(0, 3).toUpperCase(),
-            color: '#00A3E0',
+            color: '#17635F',
+            points_stage: 0,
+            points_nonstage: 0,
+            points_sports: 0,
             sectionPoints: {},
             totalPoints: 0,
             totalWins: 0
           };
         }
-        if (!teamSectionDataMap[w.team].sectionPoints[sec]) {
-          teamSectionDataMap[w.team].sectionPoints[sec] = 0;
+        
+        const pts = (w.points || 0);
+        const sectionName = String(prog.category || prog.section || '').trim();
+        if (sectionName) {
+          const sectionKey = sectionName.toUpperCase();
+          teamSectionDataMap[w.team].sectionPoints[sectionKey] =
+            (teamSectionDataMap[w.team].sectionPoints[sectionKey] || 0) + pts;
         }
-        teamSectionDataMap[w.team].sectionPoints[sec] += (w.points || 0);
+        if (detectedType === 'stage') {
+            teamSectionDataMap[w.team].points_stage += pts;
+        } else if (detectedType === 'non-stage') {
+            teamSectionDataMap[w.team].points_nonstage += pts;
+        } else if (detectedType === 'sports') {
+            teamSectionDataMap[w.team].points_sports += pts;
+        }
       });
     }
   });
 
   const sortedTeams = Object.values(teamSectionDataMap).sort((a, b) => b.totalPoints - a.totalPoints);
 
-  // Render Section Column Table
+  // Render category donut cards and the detailed standings table
   let html = `
-    <div class="w-full bg-white border border-slate-200/90 rounded-2xl shadow-sm p-5 mb-6">
-      <h4 class="text-sm font-medium text-slate-800 mb-4 flex items-center gap-2"><span class="iconify text-amber-500" data-icon="solar:chart-square-bold"></span> Points Breakdown by Section</h4>
-      <div id="team-sections-chart" class="w-full h-72"></div>
+    <div class="team-profile-hero mb-6">
+      <div>
+        <span class="team-profile-eyebrow">Championship overview</span>
+        <h4>How every team is performing</h4>
+        <p>Explore the points distribution across each competition category.</p>
+      </div>
+      <div class="team-profile-hero-icon">
+        <span class="iconify" data-icon="solar:pie-chart-3-bold-duotone"></span>
+      </div>
+    </div>
+    <div class="team-pie-grid mb-6">
+      ${isSportsView ? `
+      <article class="team-pie-card team-pie-card--teal">
+        <div class="team-pie-heading"><span class="team-pie-icon"><span class="iconify" data-icon="solar:running-2-bold-duotone"></span></span><div><h5>Sports</h5><p>Athletic event points</p></div></div>
+        <div id="team-chart-sports" class="team-pie-chart"></div>
+      </article>
+      ` : `
+      <article class="team-pie-card team-pie-card--gold">
+        <div class="team-pie-heading"><span class="team-pie-icon"><span class="iconify" data-icon="solar:palette-bold-duotone"></span></span><div><h5>Arts Total</h5><p>Stage + non-stage</p></div></div>
+        <div id="team-chart-arts" class="team-pie-chart"></div>
+      </article>
+      <article class="team-pie-card team-pie-card--magenta">
+        <div class="team-pie-heading"><span class="team-pie-icon"><span class="iconify" data-icon="solar:microphone-3-bold-duotone"></span></span><div><h5>Stage</h5><p>Live performance points</p></div></div>
+        <div id="team-chart-stage" class="team-pie-chart"></div>
+      </article>
+      <article class="team-pie-card team-pie-card--primary">
+        <div class="team-pie-heading"><span class="team-pie-icon"><span class="iconify" data-icon="solar:pen-new-square-bold-duotone"></span></span><div><h5>Non-Stage</h5><p>Creative event points</p></div></div>
+        <div id="team-chart-nonstage" class="team-pie-chart"></div>
+      </article>
+      `}
     </div>
     <div class="w-full overflow-x-auto bg-white border border-slate-200/90 rounded-2xl shadow-sm">
       <table class="w-full text-left border-collapse min-w-[640px]">
         <thead>
           <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-medium uppercase tracking-wider">
             <th class="py-3.5 px-4 font-medium">Rank & Team</th>
-            ${createdSections.map(sec => `<th class="py-3.5 px-3 text-center font-medium">${sec}</th>`).join('')}
+            ${standingsSections.map(sectionName =>
+              `<th class="py-3.5 px-3 text-center font-medium">${sectionName}</th>`
+            ).join('')}
+            ${isSportsView
+              ? '<th class="py-3.5 px-3 text-center font-medium">Sports</th>'
+              : '<th class="py-3.5 px-3 text-center font-medium">Arts</th><th class="py-3.5 px-3 text-center font-medium">Stage</th><th class="py-3.5 px-3 text-center font-medium">Non-Stage</th>'}
             <th class="py-3.5 px-4 text-right bg-amber-50/60 text-amber-900 font-medium">Total</th>
           </tr>
         </thead>
@@ -919,6 +1030,8 @@ function renderTeamProfiles() {
   sortedTeams.forEach((t, idx) => {
     const rankBadgeColor = idx === 0 ? 'bg-amber-400 text-slate-950 font-medium border-amber-500' : idx === 1 ? 'bg-slate-200 text-slate-900 border-slate-300' : idx === 2 ? 'bg-amber-700 text-white border-amber-800' : 'bg-slate-100 text-slate-600 border-slate-200';
     const rankLabel = idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : `#${idx + 1}`;
+    
+    const artsTotal = t.points_stage + t.points_nonstage;
 
     html += `
       <tr class="hover:bg-slate-50/80 transition-colors">
@@ -933,10 +1046,13 @@ function renderTeamProfiles() {
             </div>
           </div>
         </td>
-        ${createdSections.map(sec => {
-          const pts = t.sectionPoints[sec] || 0;
-          return `<td class="py-3.5 px-3 text-center font-medium ${pts > 0 ? 'text-slate-800' : 'text-slate-300'}">${pts}</td>`;
+        ${standingsSections.map(sectionName => {
+          const sectionPoints = t.sectionPoints[sectionName.toUpperCase()] || 0;
+          return `<td class="py-3.5 px-3 text-center font-medium ${sectionPoints > 0 ? 'text-slate-800' : 'text-slate-300'}">${sectionPoints}</td>`;
         }).join('')}
+        ${isSportsView
+          ? `<td class="py-3.5 px-3 text-center font-medium ${t.points_sports > 0 ? 'text-slate-800' : 'text-slate-300'}">${t.points_sports}</td>`
+          : `<td class="py-3.5 px-3 text-center font-bold text-slate-800">${artsTotal}</td><td class="py-3.5 px-3 text-center font-medium ${t.points_stage > 0 ? 'text-slate-800' : 'text-slate-300'}">${t.points_stage}</td><td class="py-3.5 px-3 text-center font-medium ${t.points_nonstage > 0 ? 'text-slate-800' : 'text-slate-300'}">${t.points_nonstage}</td>`}
         <td class="py-3.5 px-4 text-right font-medium text-xs sm:text-sm text-slate-900 bg-amber-50/30">${t.totalPoints}</td>
       </tr>
     `;
@@ -950,84 +1066,61 @@ function renderTeamProfiles() {
 
   leaderboardContainer.innerHTML = html;
 
-  // Render ApexChart
+  // Render a separate donut chart for every category.
   if (typeof ApexCharts !== 'undefined' && sortedTeams.length > 0) {
-    const chartEl = document.getElementById('team-sections-chart');
-    if (chartEl) {
-      const teamNames = sortedTeams.map(t => t.name);
-      const seriesData = createdSections.map(sec => {
-        return {
-          name: sec,
-          data: sortedTeams.map(t => t.sectionPoints[sec] || 0)
-        };
-      });
+    if (Array.isArray(window.teamChartInstances)) {
+      window.teamChartInstances.forEach(chart => chart.destroy());
+    }
+    window.teamChartInstances = [];
+
+    const teamNames = sortedTeams.map(t => t.name);
+    const chartColors = ['#17635F', '#C0912B', '#92205D'];
+    const chartSets = isSportsView
+      ? [{ id: 'team-chart-sports', values: sortedTeams.map(t => t.points_sports) }]
+      : [
+          { id: 'team-chart-arts', values: sortedTeams.map(t => t.points_stage + t.points_nonstage) },
+          { id: 'team-chart-stage', values: sortedTeams.map(t => t.points_stage) },
+          { id: 'team-chart-nonstage', values: sortedTeams.map(t => t.points_nonstage) }
+        ];
+
+    chartSets.forEach(chartSet => {
+      const chartEl = document.getElementById(chartSet.id);
+      if (!chartEl) return;
+      const total = chartSet.values.reduce((sum, value) => sum + Number(value || 0), 0);
+      if (total === 0) {
+        chartEl.innerHTML = `<div class="team-chart-empty"><span class="iconify" data-icon="solar:chart-2-outline"></span><strong>0 points</strong><small>No points recorded yet</small></div>`;
+        return;
+      }
 
       const options = {
-        series: seriesData,
-        colors: ['#0ea5e9', '#8b5cf6', '#f43f5e', '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6'],
-        chart: {
-          type: 'bar',
-          height: 320,
-          stacked: false,
-          toolbar: { show: false },
-          fontFamily: 'inherit',
-          dropShadow: {
-            enabled: true,
-            top: 2,
-            left: 0,
-            blur: 4,
-            color: '#000',
-            opacity: 0.05
+        series: chartSet.values,
+        labels: teamNames,
+        colors: chartColors,
+        chart: { type: 'donut', height: 245, fontFamily: 'inherit', toolbar: { show: false } },
+        stroke: { width: 4, colors: ['#ffffff'] },
+        dataLabels: { enabled: false },
+        plotOptions: {
+          pie: {
+            expandOnClick: true,
+            donut: {
+              size: '70%',
+              labels: {
+                show: true,
+                name: { show: true, offsetY: 18, color: '#64748b', fontSize: '11px' },
+                value: { show: true, offsetY: -10, color: '#17635F', fontSize: '24px', fontWeight: 700, formatter: value => `${value} pts` },
+                total: { show: true, label: 'TOTAL POINTS', color: '#64748b', fontSize: '10px', formatter: () => total }
+              }
+            }
           }
         },
-        plotOptions: {
-          bar: { 
-            horizontal: false, 
-            borderRadius: 4, 
-            borderRadiusApplication: 'end',
-            columnWidth: '70%' 
-          },
-        },
-        dataLabels: { 
-          enabled: false
-        },
-        stroke: { width: 1, colors: ['transparent'] },
-        xaxis: {
-          categories: teamNames,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: { style: { colors: '#64748b', fontSize: '12px', fontWeight: 600 } }
-        },
-        yaxis: {
-          labels: { style: { colors: '#94a3b8', fontSize: '11px', fontWeight: 500 } }
-        },
-        grid: {
-          borderColor: '#f1f5f9',
-          strokeDashArray: 4,
-          padding: { top: 0, right: 0, bottom: 0, left: 10 }
-        },
-        fill: { opacity: 1 },
-        legend: { 
-          position: 'top', 
-          horizontalAlign: 'right', 
-          fontSize: '12px', 
-          fontWeight: 500,
-          labels: { colors: '#475569' },
-          markers: { radius: 12, width: 10, height: 10 } 
-        },
-        tooltip: {
-          theme: 'light',
-          y: { formatter: function (val) { return val + " Pts" } },
-          style: { fontSize: '12px', fontFamily: 'inherit' }
-        }
+        legend: { position: 'bottom', fontSize: '11px', fontWeight: 500, labels: { colors: '#475569' }, markers: { width: 8, height: 8, radius: 8 }, itemMargin: { horizontal: 6, vertical: 3 } },
+        tooltip: { y: { formatter: value => `${value} Points` } },
+        responsive: [{ breakpoint: 480, options: { chart: { height: 225 }, legend: { fontSize: '10px' } } }]
       };
-
-      if (window.teamChartInstance) {
-        window.teamChartInstance.destroy();
-      }
-      window.teamChartInstance = new ApexCharts(chartEl, options);
-      window.teamChartInstance.render();
-    }
+      const chart = new ApexCharts(chartEl, options);
+      window.teamChartInstances.push(chart);
+      chart.render();
+    });
   }
 }
 
@@ -1048,6 +1141,8 @@ function renderViews() {
     const isPub = prog.isPublished === true;
     if (!isPub) return false;
 
+    if (!matchesActiveProgramType(prog)) return false;
+
     const progSec = (prog.category || prog.section || '').toUpperCase();
     if (activeSection !== 'ALL' && progSec !== activeSection.toUpperCase()) return false;
 
@@ -1066,8 +1161,9 @@ function renderViews() {
 
   const countTextEl = document.getElementById('results-count-text');
   if (countTextEl || countBadge) {
-    const publishedProgsCount = allPrograms.filter(p => p.isPublished === true).length;
-    const totalProgsCount = allPrograms.length;
+    const typeFilteredPrograms = allPrograms.filter(matchesActiveProgramType);
+    const publishedProgsCount = typeFilteredPrograms.filter(p => p.isPublished === true).length;
+    const totalProgsCount = typeFilteredPrograms.length;
     const countText = totalProgsCount === 0
       ? `-- / -- Published`
       : `${publishedProgsCount} Published`;
@@ -1489,7 +1585,7 @@ function renderCandidateToppers() {
   const createdSections = getCreatedSectionsList().filter(s => s.toUpperCase() !== 'KULLIYA');
   createdSections.forEach(sec => sectionCandidateMap[sec.toUpperCase()] = { secName: sec, candidates: {} });
 
-  allPrograms.forEach(p => {
+  allPrograms.filter(matchesActiveProgramType).forEach(p => {
     const section = (p.category || p.section || '').toUpperCase();
     const isKulliyaSection = section === 'KULLIYA';
     const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
@@ -1760,9 +1856,9 @@ window.openProgramModal = function (programId) {
 
         let avatarHtml = '';
         if (photoUrl) {
-          avatarHtml = `<img src="${photoUrl}" alt="${w.candidateName}" class="w-12 h-12 rounded-xl object-cover border border-amber-300 shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-12 h-12 rounded-xl bg-[#0c2f82] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase\\'>${initials}</div>';" />`;
+          avatarHtml = `<img src="${photoUrl}" alt="${w.candidateName}" class="w-12 h-12 rounded-xl object-cover border border-amber-300 shrink-0" onerror="this.onerror=null; this.outerHTML='<div class=\\'w-12 h-12 rounded-xl bg-[#17635F] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase\\'>${initials}</div>';" />`;
         } else {
-          avatarHtml = `<div class="w-12 h-12 rounded-xl bg-[#0c2f82] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase">${initials}</div>`;
+          avatarHtml = `<div class="w-12 h-12 rounded-xl bg-[#17635F] text-amber-300 font-bold text-sm flex items-center justify-center border border-amber-300 shrink-0 uppercase">${initials}</div>`;
         }
 
         return `
@@ -1812,7 +1908,7 @@ function startDashboardCycle() {
   if (dashboardCycleInterval) clearInterval(dashboardCycleInterval);
   dashboardCycleInterval = setInterval(() => {
     if (activeSidebarTab !== 'dashboard') return;
-    const publishedProgs = allPrograms.filter(p => p.isPublished === true).slice(0, 7);
+    const publishedProgs = allPrograms.filter(p => p.isPublished === true && matchesActiveProgramType(p)).slice(0, 7);
     if (publishedProgs.length <= 1) return;
     let currentIndex = publishedProgs.findIndex(p => p.id === activeDashboardProgramId);
     let nextIndex = (currentIndex + 1) % publishedProgs.length;
@@ -1835,13 +1931,14 @@ function startDashboardCycle() {
 }
 
 function updateDashboardHeaderInfo() {
-  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true && matchesActiveProgramType(p));
 
   if (!activeDashboardProgramId && publishedProgs.length > 0) {
     activeDashboardProgramId = publishedProgs[0].id;
   }
 
   const activeProg = publishedProgs.find(p => p.id === activeDashboardProgramId) || publishedProgs[0];
+  activeDashboardProgramId = activeProg ? activeProg.id : null;
 
   const progNameEl = document.getElementById('dash-program-name-text');
   const secTextEl = document.getElementById('dash-tab-section-text');
@@ -1919,11 +2016,11 @@ function getTeamGradientStyle(teamName, rankPosition, winner, matchedCand) {
   }
 
   if (rankPosition === 1) {
-    return `background: linear-gradient(160deg, #1e3a8a 0%, #081229 95%); border: 1.5px solid #fbbf24;`;
+    return `background: linear-gradient(160deg, #17635F 0%, #17635F 95%); border: 1.5px solid #C0912B;`;
   } else if (rankPosition === 2) {
     return `background: linear-gradient(160deg, #334155 0%, #081229 95%); border: 1.5px solid #cbd5e1;`;
   }
-  return `background: linear-gradient(160deg, #451a03 0%, #081229 95%); border: 1.5px solid #d97706;`;
+  return `background: linear-gradient(160deg, #92205D 0%, #92205D 95%); border: 1.5px solid #C0912B;`;
 }
 
 function getCandidateAvatarContent(winner, rankPosition) {
@@ -1975,7 +2072,7 @@ function renderDashboardPodium() {
   const container = document.getElementById('dashboard-podium-container');
   if (!container) return;
 
-  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true && matchesActiveProgramType(p));
   const activeProg = publishedProgs.find(p => p.id === activeDashboardProgramId) || publishedProgs[0];
 
   let winnersList = [];
@@ -2104,7 +2201,7 @@ function renderRecentUploadedList() {
   const container = document.getElementById('recent-uploaded-list');
   if (!container) return;
 
-  const publishedProgs = allPrograms.filter(p => p.isPublished === true);
+  const publishedProgs = allPrograms.filter(p => p.isPublished === true && matchesActiveProgramType(p));
 
   if (publishedProgs.length === 0) {
     container.innerHTML = `<div class="p-4 text-center text-slate-400 text-xs font-medium bg-white border border-slate-200 rounded-2xl">Result not published</div>`;
@@ -2145,6 +2242,3 @@ function renderRecentUploadedList() {
     `;
   }).join('');
 }
-
-
-

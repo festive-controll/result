@@ -4,18 +4,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sibaq '25 Result Portal | Kauthukam</title>
+  <title>Result Portal</title>
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="https://festive-sfadc.vercel.app/asset/5Rect.png">
+  <link rel="icon" type="image/png" href="https://festive-sfadc.vercel.app/asset/logoR.png">
   <script src="../fest-favicon.js"></script>
 
   <!-- Meta Tags -->
   <meta name="description"
-    content="Live program results, candidate toppers, team standings, and leaderboard for Sibaq '25 Result Portal.">
+    content="Live program results, candidate toppers, team standings, and leaderboard.">
 
-  <!-- Typography: Clash Grotesk (Regular & Medium) -->
-  <link href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600&display=swap" rel="stylesheet">
+  <!-- Typography: Cobe -->
 
   <!-- Iconify Framework -->
   <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
@@ -36,7 +35,7 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Clash Grotesk', 'sans-serif'],
+            sans: ['Cobe', 'sans-serif'],
           }
         }
       }
@@ -56,11 +55,11 @@
       <!-- Left: Logo Badge & Title -->
       <a href="https://festive-sfadc.vercel.app/index.html" class="flex items-center gap-3 group shrink-0">
         <div class="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center border border-amber-600 p-1.5">
-          <img src="https://festive-sfadc.vercel.app/asset/5Rect.png" alt="Festival Emblem" class="w-6 h-6 object-contain" data-fest="logo">
+          <img src="https://festive-sfadc.vercel.app/asset/logoR.png" alt="Festival Emblem" class="w-6 h-6 object-contain" data-fest="logo">
         </div>
         <div>
           <div class="text-[11px] font-medium text-amber-600 leading-none uppercase tracking-wide">
-            SIBAQ <span data-fest="year-short">'25</span>
+            <span data-fest="name">Festival</span> <span data-fest="year-short">'25</span>
           </div>
           <h1 class="font-bold text-slate-900 text-base leading-tight tracking-tight mt-0.5" data-fest="name">
             artfest
@@ -96,13 +95,14 @@
         </div>
       </div>
 
-      <!-- Right: General Pill Button -->
+      <!-- Right: Program Type Filter -->
       <div class="flex items-center gap-3 shrink-0">
-        <a href="https://festive-sfadc.vercel.app/index.html"
-          class="px-4 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 font-medium rounded-lg text-xs transition-all flex items-center gap-1.5 border border-sky-200">
-          <span>General</span>
-          <span class="iconify text-sky-600 text-sm" data-icon="solar:global-linear"></span>
-        </a>
+        <button id="program-type-toggle" type="button" data-program-type="ARTS"
+          aria-label="Showing Arts results; click for Sports"
+          class="px-4 py-1.5 text-white font-medium rounded-lg text-xs transition-all flex items-center gap-1.5 border">
+          <span id="program-type-icon" class="iconify text-sm" data-icon="solar:palette-outline"></span>
+          <span id="program-type-label">Arts</span>
+        </button>
       </div>
 
     </div>
@@ -201,7 +201,7 @@
             <div class="w-full flex flex-wrap items-center justify-center gap-2 mb-6">
               <!-- Program Name Badge (Flat Solid Dark Blue) -->
               <div
-                class="inline-flex items-center gap-2 px-4 py-1.5 bg-[#0c2f82] text-white rounded-full border border-blue-900 shrink-0">
+                class="inline-flex items-center gap-2 px-4 py-1.5 bg-[#17635F] text-white rounded-full border border-blue-900 shrink-0">
                 <span class="iconify text-amber-400 text-base" data-icon="solar:medal-ribbons-star-bold"></span>
                 <span id="dash-program-name-text" class="font-bold text-xs sm:text-sm tracking-tight">Select
                   Program</span>
@@ -224,12 +224,12 @@
           </div>
 
           <!-- Right Column: Recent Uploaded List -->
-          <div class="lg:col-span-1 space-y-4">
+          <div class="recent-uploaded-panel lg:col-span-1">
             <h3 class="text-amber-500 font-normal text-lg sm:text-xl tracking-tight">
               Recent Uploaded
             </h3>
 
-            <div id="recent-uploaded-list" class="space-y-3">
+            <div id="recent-uploaded-list" class="recent-uploaded-viewport space-y-3">
               <!-- Rendered dynamically via script.js -->
             </div>
           </div>
@@ -330,12 +330,12 @@
             <!-- Emblem Logo -->
             <div
               class="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center border border-amber-600 mb-2.5 p-2 shadow-sm">
-              <img src="https://festive-sfadc.vercel.app/asset/5Rect.png" alt="Emblem Logo" class="w-10 h-10 object-contain" data-fest="logo">
+              <img src="https://festive-sfadc.vercel.app/asset/logoR.png" alt="Emblem Logo" class="w-10 h-10 object-contain" data-fest="logo">
             </div>
             <!-- SIBAQ Tag -->
             <div
               class="text-[11px] font-medium text-amber-700 tracking-wider uppercase bg-amber-50 px-3 py-0.5 rounded-full border border-amber-200/80 mb-1 inline-block">
-              SIBAQ <span data-fest="year-short">'25</span>
+              <span data-fest="name">Festival</span> <span data-fest="year-short">'25</span>
             </div>
             <h2 class="text-xl sm:text-2xl font-medium text-slate-900 tracking-tight">Candidate Profile Login</h2>
             <p class="text-xs font-normal text-slate-500 mt-0.5">Enter 3-digit chest number</p>
@@ -365,7 +365,7 @@
           <!-- Action Buttons Row: Login Button & Quick QR Scan Button -->
           <div class="space-y-3 pt-2">
             <button id="cand-login-btn" onclick="executeCandidateLogin()"
-              class="w-full py-3 bg-[#0c2f82] hover:bg-blue-900 text-white font-medium text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm">
+              class="w-full py-3 bg-[#17635F] hover:bg-blue-900 text-white font-medium text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm">
               <span class="iconify text-lg text-amber-400" data-icon="solar:user-bold-duotone"></span>
               <span>Login</span>
             </button>
@@ -407,7 +407,7 @@
               <div class="flex items-center gap-4">
                 <!-- Avatar Circle -->
                 <div id="cand-avatar"
-                  class="w-14 h-14 rounded-2xl bg-[#0c2f82] text-white font-medium text-2xl flex items-center justify-center border-2 border-white shadow-sm shrink-0">
+                  class="w-14 h-14 rounded-2xl bg-[#17635F] text-white font-medium text-2xl flex items-center justify-center border-2 border-white shadow-sm shrink-0">
                   M
                 </div>
                 <div>
