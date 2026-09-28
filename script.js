@@ -615,10 +615,16 @@ function parseGradeLabel(grade) {
   return clean || str || 'A';
 }
 
+// Stage 1 (resultsPublished) sends a result to the admin printing workflow.
+// Stage 2 (websitePublished) is the separate approval that exposes it publicly.
+function isPublicResultPublished(program) {
+  return program && program.resultsPublished === true && program.websitePublished === true;
+}
+
 function processDataAndRender() {
   allPrograms.forEach(prog => {
     const matchingResults = allResults.filter(r => r.programId === prog.id || r.programCode === prog.code);
-    prog.isPublished = prog.resultsPublished === true;
+    prog.isPublished = isPublicResultPublished(prog);
     
     if (matchingResults.length > 0) {
       prog.winners = matchingResults.map(r => ({
