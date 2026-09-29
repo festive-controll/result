@@ -151,7 +151,11 @@ function initEventListeners() {
       renderCategoryToppersGrid();
       renderTeamProfiles();
       renderCandidateToppers();
-      switchSidebarTab('dashboard');
+      renderDashboardView();
+      renderViews();
+      if (activeSidebarTab === 'candidate' && authenticatedCandidate) {
+        renderAuthenticatedCandidateView(authenticatedCandidate);
+      }
     });
   }
 
@@ -789,12 +793,44 @@ function findProgramFromReference(ref) {
   const refId = data.programId ?? data.progId ?? data.id;
   const refCode = data.programCode ?? data.code;
   const refName = data.programName ?? data.name;
-  return allPrograms.find(program =>
-    (refId != null && String(program.id) === String(refId)) ||
-    (refId != null && program.progId != null && String(program.progId) === String(refId)) ||
-    (refCode && normalizeSearchValue(program.code) === normalizeSearchValue(refCode)) ||
-    (refName && normalizeSearchValue(program.name) === normalizeSearchValue(refName))
-  ) || null;
+  if (refId != null && String(refId).trim()) {
+    return allPrograms.find(program =>
+      String(program.id) === String(refId) ||
+      (program.progId != null && String(program.progId) === String(refId))
+    ) || null;
+  }
+
+  const refSection = normalizeSearchValue(data.category ?? data.section);
+  const legacyMatches = allPrograms.filter(program => {
+    const identityMatches =
+      (refCode && normalizeSearchValue(program.code) === normalizeSearchValue(refCode)) ||
+      (refName && normalizeSearchValue(program.name) === normalizeSearchValue(refName));
+    const programSection = normalizeSearchValue(program.category || program.section);
+    return identityMatches && (!refSection || programSection === refSection);
+  });
+
+  // Codes and names can repeat between sections. Never guess when a legacy
+  // reference does not identify exactly one canonical program.
+  return legacyMatches.length === 1 ? legacyMatches[0] : null;
+}
+
+function resultBelongsToProgram(result, program) {
+  const resultProgramId = result?.programId ?? result?.progId;
+  if (resultProgramId != null && String(resultProgramId).trim()) {
+    return String(resultProgramId) === String(program.id) ||
+      (program.progId != null && String(resultProgramId) === String(program.progId));
+  }
+
+  const resultCode = normalizeSearchValue(result?.programCode || result?.code);
+  if (!resultCode || resultCode !== normalizeSearchValue(program.code)) return false;
+
+  const resultSection = normalizeSearchValue(result?.category || result?.section);
+  const programSection = normalizeSearchValue(program.category || program.section);
+  if (resultSection) return resultSection === programSection;
+
+  // Old result rows without an ID/section may use a code only when that code
+  // is unique across the entire festival.
+  return allPrograms.filter(item => normalizeSearchValue(item.code) === resultCode).length === 1;
 }
 
 function programIdentity(program, fallback = {}) {
@@ -878,7 +914,7 @@ function isPublicResultPublished(program) {
 
 function processDataAndRender() {
   allPrograms.forEach(prog => {
-    const matchingResults = allResults.filter(r => r.programId === prog.id || r.programCode === prog.code);
+    const matchingResults = allResults.filter(r => resultBelongsToProgram(r, prog));
     prog.isPublished = isPublicResultPublished(prog);
     
     prog.winners = matchingResults.map(r => {
@@ -1676,13 +1712,30 @@ function renderAuthenticatedCandidateView(cand) {
   const candId = norm(cand.id || cand.candidateId);
   const candChest = digits(cand.chestNo || cand.chest);
   const candName = norm(cand.name || cand.candidateName);
+  const candSection = normalizeSearchValue(cand.section || cand.category);
+
+  const winnerMatchesCandidate = (winner, program) => {
+    const winnerId = norm(winner?.candidateId);
+    if (winnerId) return Boolean(candId && winnerId === candId);
+
+    const programSection = normalizeSearchValue(program?.category || program?.section);
+    if (candSection && programSection && candSection !== programSection) return false;
+
+    return (candChest && digits(winner?.chestNo || winner?.chest) === candChest) ||
+      (candName && norm(winner?.candidateName || winner?.name) === candName);
+  };
 
   const registrationMatchesCandidate = reg => {
     const ids = Array.isArray(reg.candidateIds) ? reg.candidateIds : [reg.candidateId].filter(Boolean);
     const chests = Array.isArray(reg.chestNumbers) ? reg.chestNumbers : [reg.chestNo || reg.chest].filter(Boolean);
     const names = Array.isArray(reg.candidateNames) ? reg.candidateNames : [reg.candidateName || reg.name].filter(Boolean);
-    return (candId && ids.some(id => norm(id) === candId)) ||
-      (candChest && chests.some(chest => digits(chest) === candChest)) ||
+    if (ids.length) return Boolean(candId && ids.some(id => norm(id) === candId));
+
+    const regProgram = findProgramFromReference(reg);
+    const regSection = normalizeSearchValue(reg.category || reg.section || regProgram?.category || regProgram?.section);
+    if (candSection && regSection && candSection !== regSection) return false;
+
+    return (candChest && chests.some(chest => digits(chest) === candChest)) ||
       (candName && names.some(name => norm(name) === candName));
   };
 
@@ -1729,11 +1782,7 @@ function renderAuthenticatedCandidateView(cand) {
   // Results may be the only surviving source for a legacy participation.
   allPrograms.forEach(prog => {
     if (Array.isArray(prog.winners)) {
-      const match = prog.winners.find(w =>
-        (candId && norm(w.candidateId) === candId) ||
-        (candChest && digits(w.chestNo || w.chest) === candChest) ||
-        (candName && norm(w.candidateName || w.name) === candName)
-      );
+      const match = prog.winners.find(w => winnerMatchesCandidate(w, prog));
       if (match) addEvent(prog);
     }
   });
@@ -1744,21 +1793,21 @@ function renderAuthenticatedCandidateView(cand) {
     const prog = event.program;
     event.isPublished = prog?.isPublished === true;
     if (!prog || !Array.isArray(prog.winners)) return;
-    event.result = prog.winners.find(w =>
-      (candId && norm(w.candidateId) === candId) ||
-      (candChest && digits(w.chestNo || w.chest) === candChest) ||
-      (candName && norm(w.candidateName || w.name) === candName)
-    ) || (!isIndividualProgram(prog) ? prog.winners.find(w =>
+    event.result = prog.winners.find(w => winnerMatchesCandidate(w, prog)) || (!isIndividualProgram(prog) ? prog.winners.find(w =>
       norm(w.team || w.teamName) === norm(cand.team || cand.teamName)
     ) : null) || null;
   });
 
+  // The candidate profile follows the same global Arts/Sports scope as every
+  // other result view. This also keeps all profile totals consistent with the
+  // visible event cards.
   const candResults = Array.from(candidateEvents.values())
+    .filter(event => event.program && matchesActiveProgramType(event.program))
     .sort((a, b) => String(a.programCode).localeCompare(String(b.programCode), undefined, { numeric: true }));
   publishedCount = candResults.filter(event => event.isPublished).length;
   totalPts = candResults.reduce((sum, event) =>
     sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
-  const totalParticipations = Math.max(candResults.length, Number(cand.eventCount) || 0);
+  const totalParticipations = candResults.length;
 
   const statPts = document.getElementById('cand-stat-points');
   const statWins = document.getElementById('cand-stat-wins');
