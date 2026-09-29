@@ -36,7 +36,6 @@ let allPositionTemplates = [];
 let allTeams = [];
 let allCandidates = [];
 let dbSections = []; // Created sections from Firestore 'sections' collection
-let starredPrograms = JSON.parse(localStorage.getItem('sibaq_starred_programs') || '[]');
 let authenticatedCandidate = null;
 let isResultPresent = true;
 
@@ -778,10 +777,52 @@ function getProgramMaximumMarks(prog) {
   const positionTemplateId = prog.positionTemplateId || prog.positionTemplate;
   const gradeMaximum = prog.enableGrading === false ? 0 : templateMaximum(allGradeTemplates.find(t => t.id === gradeTemplateId));
   const positionMaximum = prog.enableScoring === false ? 0 : templateMaximum(allPositionTemplates.find(t => t.id === positionTemplateId));
-  return gradeMaximum + positionMaximum || 8;
+  // Legacy programs may not have template IDs. Their public score cards use a
+  // ten-point scale, so keep the denominator consistent instead of inventing
+  // an eight-point maximum while the templates are absent or still loading.
+  return gradeMaximum + positionMaximum || 10;
 }
 
-function getCandidateScorePercentage(candidate, winner, obtainedMarks) {
+function findProgramFromReference(ref) {
+  if (!ref) return null;
+  const data = typeof ref === 'object' ? ref : { programId: ref, programCode: ref, programName: ref };
+  const refId = data.programId ?? data.progId ?? data.id;
+  const refCode = data.programCode ?? data.code;
+  const refName = data.programName ?? data.name;
+  return allPrograms.find(program =>
+    (refId != null && String(program.id) === String(refId)) ||
+    (refId != null && program.progId != null && String(program.progId) === String(refId)) ||
+    (refCode && normalizeSearchValue(program.code) === normalizeSearchValue(refCode)) ||
+    (refName && normalizeSearchValue(program.name) === normalizeSearchValue(refName))
+  ) || null;
+}
+
+function programIdentity(program, fallback = {}) {
+  const data = program || {};
+  const id = data.id ?? data.progId ?? fallback.programId ?? fallback.progId;
+  const code = data.code ?? fallback.programCode ?? fallback.code;
+  const name = data.name ?? fallback.programName ?? fallback.name;
+  if (id != null && String(id).trim()) return `id:${String(id).trim()}`;
+  if (code && normalizeSearchValue(code)) return `code:${normalizeSearchValue(code)}`;
+  if (name && normalizeSearchValue(name)) return `name:${normalizeSearchValue(name)}`;
+  return '';
+}
+
+function isIndividualProgram(program) {
+  const type = normalizeSearchValue(program?.type || program?.programType || 'individual');
+  return type !== 'group' && !type.includes('group');
+}
+
+function isStarredGradeProgram(program) {
+  if (!program) return false;
+  const templateRef = program.gradeTemplateId || program.gradeTemplate || '';
+  const template = allGradeTemplates.find(item => String(item.id) === String(templateRef));
+  const templateName = template?.name || template?.templateName || template?.title || template?.label || templateRef;
+  const firstWord = normalizeSearchValue(templateName).split(' ')[0].replace(/d+$/, 'd');
+  return firstWord === 'starred';
+}
+
+function getCandidateScorePercentage(candidate, winner, obtainedMarks, details = null) {
   const norm = value => String(value == null ? '' : value).trim().toLowerCase();
   const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
   const candId = norm(candidate?.id || candidate?.candidateId || winner?.candidateId);
@@ -789,8 +830,11 @@ function getCandidateScorePercentage(candidate, winner, obtainedMarks) {
   const candName = norm(candidate?.name || candidate?.candidateName || winner?.candidateName || winner?.name);
   const programs = new Map();
   const addProgram = prog => {
-    if (!prog || norm(prog.type || 'individual') !== 'individual') return;
-    programs.set(norm(prog.id || prog.code || prog.name), prog);
+    // A topper score is point efficiency for the currently selected program
+    // type. Unrelated sports/arts and group registrations must not increase
+    // the denominator.
+    if (!prog || !isIndividualProgram(prog) || !matchesActiveProgramType(prog)) return;
+    programs.set(programIdentity(prog), prog);
   };
 
   allRegistrations.forEach(reg => {
@@ -801,22 +845,13 @@ function getCandidateScorePercentage(candidate, winner, obtainedMarks) {
       (candChest && chests.some(chest => digits(chest) === candChest)) ||
       (candName && names.some(name => norm(name) === candName));
     if (!matches) return;
-    addProgram(allPrograms.find(p =>
-      (reg.programId && String(p.id) === String(reg.programId)) ||
-      (reg.programCode && norm(p.code) === norm(reg.programCode)) ||
-      (reg.programName && norm(p.name) === norm(reg.programName))
-    ));
+    addProgram(findProgramFromReference(reg));
   });
 
   const explicitPrograms = candidate?.programs || candidate?.registeredPrograms || candidate?.events || [];
   if (Array.isArray(explicitPrograms)) explicitPrograms.forEach(ref => {
     const item = typeof ref === 'object' && ref !== null ? ref : { id: ref, code: ref, name: ref };
-    addProgram(allPrograms.find(p =>
-      (item.id && String(p.id) === String(item.id)) ||
-      (item.programId && String(p.id) === String(item.programId)) ||
-      ((item.code || item.programCode) && norm(p.code) === norm(item.code || item.programCode)) ||
-      ((item.name || item.programName) && norm(p.name) === norm(item.name || item.programName))
-    ));
+    addProgram(findProgramFromReference(item));
   });
 
   allPrograms.forEach(prog => {
@@ -828,6 +863,10 @@ function getCandidateScorePercentage(candidate, winner, obtainedMarks) {
   });
 
   const maximumMarks = Array.from(programs.values()).reduce((sum, prog) => sum + getProgramMaximumMarks(prog), 0);
+  if (details && typeof details === 'object') {
+    details.programCount = programs.size;
+    details.maximumMarks = maximumMarks;
+  }
   return maximumMarks > 0 ? Math.min(100, (Number(obtainedMarks) || 0) / maximumMarks * 100) : 0;
 }
 
@@ -1416,8 +1455,6 @@ function renderViews() {
   programGrid.innerHTML = filtered.map(prog => {
     const isPub = prog.isPublished === true;
     const topWinner = isPub && Array.isArray(prog.winners) && prog.winners.length > 0 ? prog.winners[0] : null;
-    const isStarred = starredPrograms.includes(prog.id);
-
     return `
       <div class="content-card p-4 flex flex-col justify-between relative overflow-hidden">
         <div>
@@ -1426,9 +1463,6 @@ function renderViews() {
               ${prog.category || prog.section || 'General'}
             </span>
             <div class="flex items-center gap-1.5">
-              <button onclick="toggleStarProgram('${prog.id}')" title="Star Program" class="text-amber-500 transition-colors">
-                <span class="iconify text-base" data-icon="${isStarred ? 'solar:star-bold' : 'solar:star-linear'}"></span>
-              </button>
               <span class="text-xs font-mono font-medium text-slate-400">#${prog.code || prog.id}</span>
             </div>
           </div>
@@ -1537,20 +1571,6 @@ window.showToast = function (message, type = 'error') {
       if (toast.parentNode) toast.parentNode.removeChild(toast);
     }, 300);
   }, 3500);
-};
-
-// Toggle Star Program
-window.toggleStarProgram = function (progId) {
-  if (starredPrograms.includes(progId)) {
-    starredPrograms = starredPrograms.filter(id => id !== progId);
-    showToast("Program removed from bookmarks", "info");
-  } else {
-    starredPrograms.push(progId);
-    showToast("Program bookmarked successfully", "success");
-  }
-  localStorage.setItem('sibaq_starred_programs', JSON.stringify(starredPrograms));
-  renderViews();
-  if (activeSidebarTab === 'starred') renderStarredPrograms();
 };
 
 // Candidate Profile Authentication & Display (3-digit chest number)
@@ -1666,11 +1686,10 @@ function renderAuthenticatedCandidateView(cand) {
       (candName && names.some(name => norm(name) === candName));
   };
 
-  const programKey = prog => norm(prog.id || prog.code || prog.name);
   const addEvent = (prog, fallback = {}) => {
     if (!prog && !fallback.programId && !fallback.programCode && !fallback.programName) return null;
     const data = prog || {};
-    const key = programKey(data) || norm(fallback.programId || fallback.programCode || fallback.programName);
+    const key = programIdentity(data, fallback);
     if (!key) return null;
     if (!candidateEvents.has(key)) {
       candidateEvents.set(key, {
@@ -1681,16 +1700,20 @@ function renderAuthenticatedCandidateView(cand) {
         isPublished: data.isPublished === true,
         result: null
       });
+    } else if (prog) {
+      // Replace a registration-only fallback with the canonical program record.
+      const event = candidateEvents.get(key);
+      event.program = prog;
+      event.programName = prog.name || event.programName;
+      event.programCode = prog.code || event.programCode;
+      event.category = prog.category || prog.section || event.category;
+      event.isPublished = prog.isPublished === true;
     }
     return candidateEvents.get(key);
   };
 
   allRegistrations.filter(registrationMatchesCandidate).forEach(reg => {
-    const prog = allPrograms.find(p =>
-      (reg.programId && (String(p.id) === String(reg.programId) || String(p.progId || '') === String(reg.programId))) ||
-      (reg.programCode && norm(p.code) === norm(reg.programCode)) ||
-      (reg.programName && norm(p.name) === norm(reg.programName))
-    );
+    const prog = findProgramFromReference(reg);
     addEvent(prog, reg);
   });
 
@@ -1698,18 +1721,12 @@ function renderAuthenticatedCandidateView(cand) {
   if (Array.isArray(explicitPrograms)) {
     explicitPrograms.forEach(item => {
       const ref = typeof item === 'object' && item !== null ? item : { programId: item, programCode: item, programName: item };
-      const prog = allPrograms.find(p =>
-        (ref.programId && String(p.id) === String(ref.programId)) ||
-        (ref.id && String(p.id) === String(ref.id)) ||
-        (ref.programCode && norm(p.code) === norm(ref.programCode)) ||
-        (ref.code && norm(p.code) === norm(ref.code)) ||
-        (ref.programName && norm(p.name) === norm(ref.programName)) ||
-        (ref.name && norm(p.name) === norm(ref.name))
-      );
+      const prog = findProgramFromReference(ref);
       addEvent(prog, ref);
     });
   }
 
+  // Results may be the only surviving source for a legacy participation.
   allPrograms.forEach(prog => {
     if (Array.isArray(prog.winners)) {
       const match = prog.winners.find(w =>
@@ -1717,21 +1734,30 @@ function renderAuthenticatedCandidateView(cand) {
         (candChest && digits(w.chestNo || w.chest) === candChest) ||
         (candName && norm(w.candidateName || w.name) === candName)
       );
-      if (match) {
-        const event = addEvent(prog);
-        if (prog.isPublished) {
-          totalPts += (match.points || 0);
-          publishedCount += 1;
-        }
-        if (event) {
-          event.isPublished = prog.isPublished === true;
-          event.result = match;
-        }
-      }
+      if (match) addEvent(prog);
     }
   });
 
-  const candResults = Array.from(candidateEvents.values());
+  // Enrich every registered event from its canonical program. For group events,
+  // the saved result belongs to the team rather than to each candidate.
+  candidateEvents.forEach(event => {
+    const prog = event.program;
+    event.isPublished = prog?.isPublished === true;
+    if (!prog || !Array.isArray(prog.winners)) return;
+    event.result = prog.winners.find(w =>
+      (candId && norm(w.candidateId) === candId) ||
+      (candChest && digits(w.chestNo || w.chest) === candChest) ||
+      (candName && norm(w.candidateName || w.name) === candName)
+    ) || (!isIndividualProgram(prog) ? prog.winners.find(w =>
+      norm(w.team || w.teamName) === norm(cand.team || cand.teamName)
+    ) : null) || null;
+  });
+
+  const candResults = Array.from(candidateEvents.values())
+    .sort((a, b) => String(a.programCode).localeCompare(String(b.programCode), undefined, { numeric: true }));
+  publishedCount = candResults.filter(event => event.isPublished).length;
+  totalPts = candResults.reduce((sum, event) =>
+    sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
   const totalParticipations = Math.max(candResults.length, Number(cand.eventCount) || 0);
 
   const statPts = document.getElementById('cand-stat-points');
@@ -1740,10 +1766,7 @@ function renderAuthenticatedCandidateView(cand) {
   const statPct = document.getElementById('cand-stat-percentage');
 
   // Only individual Normal/Starred participations contribute to this percentage.
-  const percentageEvents = candResults.filter(event => {
-    const type = norm(event.program?.type || 'individual');
-    return type === 'individual';
-  });
+  const percentageEvents = candResults.filter(event => isIndividualProgram(event.program));
   const maximumMarks = percentageEvents.reduce((sum, event) => sum + getProgramMaximumMarks(event.program), 0);
   const percentageObtainedMarks = percentageEvents.reduce((sum, event) =>
     sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
@@ -1774,6 +1797,10 @@ function renderAuthenticatedCandidateView(cand) {
                 ${getRankText(r.result.position)}${r.result.grade ? ` (Grade ${r.result.grade})` : ''}
               </span>
               <span class="block text-xs font-medium text-slate-900 mt-1">+${r.result.points || 0} Pts</span>
+            ` : r.isPublished ? `
+              <span class="px-2.5 py-0.5 bg-sky-50 text-sky-700 font-medium text-xs rounded-full border border-sky-200">
+                Result published &middot; No award
+              </span>
             ` : `
               <span class="px-2.5 py-0.5 bg-slate-100 text-slate-500 font-medium text-xs rounded-full border border-slate-200">
                 Result not published
@@ -1807,13 +1834,15 @@ function renderStarredPrograms() {
   const countBadge = document.getElementById('starred-count-badge');
   if (!container) return;
 
-  const starredList = allPrograms.filter(p => starredPrograms.includes(p.id));
+  const starredList = allPrograms
+    .filter(program => program.isPublished === true && isStarredGradeProgram(program))
+    .sort((a, b) => String(a.code || '').localeCompare(String(b.code || ''), undefined, { numeric: true }));
   if (countBadge) countBadge.textContent = `${starredList.length} Starred`;
 
   if (starredList.length === 0) {
     container.innerHTML = `
       <div class="col-span-full py-8 text-center text-slate-400 font-medium text-xs">
-        No starred programs yet. Click the star icon on any result card to bookmark it.
+        No published results use the Starred grade template yet.
       </div>
     `;
     return;
@@ -1826,9 +1855,10 @@ function renderStarredPrograms() {
           <span class="px-2 py-0.5 rounded text-[10px] font-medium uppercase bg-amber-50 text-amber-900 border border-amber-200">
             ${prog.category || prog.section}
           </span>
-          <button onclick="toggleStarProgram('${prog.id}')" class="text-amber-500">
-            <span class="iconify text-base" data-icon="solar:star-bold"></span>
-          </button>
+          <span class="inline-flex items-center gap-1 text-[10px] font-medium uppercase text-amber-700">
+            <span class="iconify text-sm" data-icon="solar:star-bold"></span>
+            Starred
+          </span>
         </div>
         <h4 class="font-medium text-slate-900 text-sm leading-snug">${prog.name}</h4>
       </div>
@@ -1930,15 +1960,23 @@ function renderCandidateToppers() {
       (c.chestNo && String(c.chestNo) === String(entry.winnerObj?.chestNo)) ||
       (c.name && c.name.toLowerCase() === (entry.name || '').toLowerCase())
     );
+    const scoreDetails = {};
+    const scorePercentage = getCandidateScorePercentage(candidate, entry.winnerObj, entry.points, scoreDetails);
     return {
       ...entry,
       matchedCandidate: candidate,
-      scorePercentage: getCandidateScorePercentage(candidate, entry.winnerObj, entry.points)
+      scorePercentage,
+      eligibleProgramCount: scoreDetails.programCount || 0
     };
   };
 
+  // Rank by point efficiency first. If two candidates have the same score,
+  // prefer more points, then the candidate who needed fewer programs.
   const percentageFirst = (a, b) =>
-    b.scorePercentage - a.scorePercentage || b.points - a.points || a.name.localeCompare(b.name);
+    b.scorePercentage - a.scorePercentage ||
+    b.points - a.points ||
+    a.eligibleProgramCount - b.eligibleProgramCount ||
+    a.name.localeCompare(b.name);
 
   const overallToppers = Object.values(candidateMap).map(attachScorePercentage).sort(percentageFirst);
 
@@ -1961,7 +1999,7 @@ function renderCandidateToppers() {
     if (matchedCand.chestNo) chestNo = matchedCand.chestNo;
   }
 
-  const percentageVal = getCandidateScorePercentage(matchedCand, collegeTopper.winnerObj, collegeTopper.points);
+  const percentageVal = collegeTopper.scorePercentage;
 
   const photoUrl = getCandidatePhotoUrl(collegeTopper.winnerObj, matchedCand);
   const initials = getInitials(collegeTopper.name);
