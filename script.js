@@ -30,6 +30,9 @@ if (typeof firebase !== 'undefined') {
 let allPrograms = [];
 let dashboardCycleInterval = null;
 let allResults = [];
+let allRegistrations = [];
+let allGradeTemplates = [];
+let allPositionTemplates = [];
 let allTeams = [];
 let allCandidates = [];
 let dbSections = []; // Created sections from Firestore 'sections' collection
@@ -113,10 +116,20 @@ function initEventListeners() {
       switchSidebarTab('results');
     }
     renderViews();
+    renderSearchSuggestions(e.target);
   };
 
-  if (searchInput) searchInput.addEventListener('input', handleSearch);
-  if (searchInputMobile) searchInputMobile.addEventListener('input', handleSearch);
+  [searchInput, searchInputMobile].filter(Boolean).forEach(input => {
+    input.addEventListener('input', handleSearch);
+    input.addEventListener('focus', () => renderSearchSuggestions(input));
+    input.addEventListener('keydown', handleSearchSuggestionKeys);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.search-suggestions') && event.target !== searchInput && event.target !== searchInputMobile) {
+      closeSearchSuggestions();
+    }
+  });
 
   // Section Selector Dropdown
   const sectionSelect = document.getElementById('section-select');
@@ -177,6 +190,93 @@ function initEventListeners() {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) closeModal();
     });
+  }
+}
+
+function getSearchSuggestionBox(input) {
+  return document.getElementById(input.id === 'search-input-mobile' ? 'search-suggestions-mobile' : 'search-suggestions');
+}
+
+function closeSearchSuggestions() {
+  document.querySelectorAll('.search-suggestions').forEach(box => box.classList.add('hidden'));
+}
+
+function renderSearchSuggestions(input) {
+  const box = getSearchSuggestionBox(input);
+  const query = normalizeSearchValue(input.value);
+  if (!box || query.length < 2) {
+    if (box) box.classList.add('hidden');
+    return;
+  }
+
+  const programs = allPrograms.filter(program =>
+    [program.name, program.code].some(value => normalizeSearchValue(value).includes(query))
+  ).slice(0, 6);
+  const students = allCandidates.filter(candidate =>
+    [candidate.name, candidate.candidateName, candidate.chestNo, candidate.chest, candidate.team]
+      .some(value => normalizeSearchValue(value).includes(query))
+  ).slice(0, 6);
+
+  box.replaceChildren();
+  const addGroup = (label, items, type) => {
+    if (!items.length) return;
+    const heading = document.createElement('div');
+    heading.className = 'search-suggestion-label';
+    heading.textContent = label;
+    box.appendChild(heading);
+    items.forEach(item => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'search-suggestion-item';
+      button.setAttribute('role', 'option');
+      button.dataset.searchType = type;
+      button.dataset.searchId = item.id || '';
+      const title = type === 'program' ? (item.name || 'Unnamed program') : (item.name || item.candidateName || 'Unnamed student');
+      const detail = type === 'program'
+        ? [item.code, item.category || item.section].filter(Boolean).join(' · ')
+        : [item.chestNo || item.chest, item.team].filter(Boolean).join(' · ');
+      button.innerHTML = `<span class="iconify text-base text-[#17635F] shrink-0" data-icon="${type === 'program' ? 'solar:document-text-outline' : 'solar:user-outline'}"></span><span class="min-w-0"><span class="block text-xs font-semibold text-slate-800 truncate"></span><span class="block text-[11px] text-slate-500 truncate"></span></span>`;
+      button.querySelector('span span:first-child').textContent = title;
+      button.querySelector('span span:last-child').textContent = detail;
+      button.addEventListener('click', () => selectSearchSuggestion(type, item));
+      box.appendChild(button);
+    });
+  };
+
+  addGroup('Students', students, 'student');
+  addGroup('Programs', programs, 'program');
+  if (!students.length && !programs.length) {
+    const empty = document.createElement('div');
+    empty.className = 'px-3 py-4 text-center text-xs text-slate-500';
+    empty.textContent = 'No matching students or programs';
+    box.appendChild(empty);
+  }
+  box.classList.remove('hidden');
+}
+
+function selectSearchSuggestion(type, item) {
+  closeSearchSuggestions();
+  if (type === 'program') openProgramModal(item.id);
+  else openCandidateProfileByChestNo(item);
+}
+
+function handleSearchSuggestionKeys(event) {
+  const box = getSearchSuggestionBox(event.currentTarget);
+  if (!box || box.classList.contains('hidden')) return;
+  const items = [...box.querySelectorAll('.search-suggestion-item')];
+  if (!items.length) return;
+  let index = items.findIndex(item => item.classList.contains('is-active'));
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (index >= 0) items[index].classList.remove('is-active');
+    index = event.key === 'ArrowDown' ? (index + 1) % items.length : (index <= 0 ? items.length - 1 : index - 1);
+    items[index].classList.add('is-active');
+    items[index].scrollIntoView({ block: 'nearest' });
+  } else if (event.key === 'Enter' && index >= 0) {
+    event.preventDefault();
+    items[index].click();
+  } else if (event.key === 'Escape') {
+    closeSearchSuggestions();
   }
 }
 
@@ -438,6 +538,24 @@ function fetchResultsData() {
     processDataAndRender();
   }, err => console.warn("ProgramResults snapshot error:", err));
 
+  // Registrations are the source of truth for participation. Results contain
+  // marks, but usually only after judging has started (and sometimes only for
+  // placed candidates), so they cannot be used to build a complete profile.
+  db.collection('registrations').onSnapshot(snapshot => {
+    allRegistrations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Registrations snapshot error:", err));
+
+  db.collection('gradeTemplates').onSnapshot(snapshot => {
+    allGradeTemplates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Grade templates snapshot error:", err));
+
+  db.collection('positionTemplates').onSnapshot(snapshot => {
+    allPositionTemplates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    processDataAndRender();
+  }, err => console.warn("Position templates snapshot error:", err));
+
   // 3. Programs Listener
   db.collection('programs').onSnapshot(progSnap => {
     allPrograms = progSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -464,13 +582,7 @@ function useFallbackData() {
 // Section hierarchy sorter: Bidāya -> Ūlā -> Thāniya -> Thānawiyya -> Āliya
 function getSectionHierarchyRank(secName) {
   if (!secName) return 999;
-  const s = String(secName).toLowerCase().replace(/[\u0300-\u036f]/g, "").trim();
-
-  // Normalize macrons & diacritics
-  const norm = s
-    .replace(/ā/g, 'a')
-    .replace(/ū/g, 'u')
-    .replace(/ī/g, 'i');
+  const norm = normalizeSearchValue(secName);
 
   if (norm.includes('bida') || norm.includes('biday')) return 1;
   if (norm.includes('ula') || norm === 'ula') return 2;
@@ -492,22 +604,27 @@ function sortSectionsByHierarchy(sections) {
 
 // Helper: Get list of created sections ordered by canonical hierarchy
 function getCreatedSectionsList() {
-  const sectionsSet = new Set();
+  const sectionsMap = new Map();
+  const addSection = section => {
+    const label = String(section || '').trim();
+    const key = normalizeSearchValue(label);
+    if (key && !sectionsMap.has(key)) sectionsMap.set(key, label);
+  };
 
   // Add sections from Firestore sections collection
   if (Array.isArray(dbSections) && dbSections.length > 0) {
-    dbSections.forEach(s => sectionsSet.add(s.trim()));
+    dbSections.forEach(addSection);
   }
 
   // Add sections created in programs dataset
   allPrograms.forEach(prog => {
     const sec = prog.category || prog.section;
     if (sec && sec.trim()) {
-      sectionsSet.add(sec.trim());
+      addSection(sec);
     }
   });
 
-  const list = Array.from(sectionsSet);
+  const list = Array.from(sectionsMap.values());
   return sortSectionsByHierarchy(list);
 }
 
@@ -584,16 +701,19 @@ function updateProgramTypeToggle() {
 function getNumericPosition(r) {
   if (!r) return 99;
 
-  if (r.position !== undefined && r.position !== null && r.position !== '' && !isNaN(parseInt(r.position))) {
-    const pos = parseInt(r.position);
+  const rawPosition = r.position?.value ?? r.position ?? r.rank ?? r.place;
+  if (rawPosition !== undefined && rawPosition !== null && rawPosition !== '' && !isNaN(parseInt(rawPosition))) {
+    const pos = parseInt(rawPosition);
     if (pos > 0 && pos <= 50) return pos;
   }
 
-  if (r.positionLabel && typeof r.positionLabel === 'string') {
-    const label = r.positionLabel.toLowerCase();
-    if (label.includes('1st') || label.startsWith('1')) return 1;
-    if (label.includes('2nd') || label.startsWith('2')) return 2;
-    if (label.includes('3rd') || label.startsWith('3')) return 3;
+  const rawLabel = r.positionLabel || r.rankLabel || r.positionName ||
+    (typeof r.position === 'object' ? r.position.label : (typeof r.position === 'string' ? r.position : ''));
+  if (rawLabel && typeof rawLabel === 'string') {
+    const label = normalizeSearchValue(rawLabel);
+    if (label.includes('1st') || label.includes('first') || label.startsWith('1')) return 1;
+    if (label.includes('2nd') || label.includes('second') || label.startsWith('2')) return 2;
+    if (label.includes('3rd') || label.includes('third') || label.startsWith('3')) return 3;
     const match = label.match(/\d+/);
     if (match) return parseInt(match[0]);
   }
@@ -609,10 +729,106 @@ function getNumericPosition(r) {
 }
 
 function parseGradeLabel(grade) {
-  if (!grade) return 'A';
+  if (grade === undefined || grade === null || String(grade).trim() === '') return '';
   const str = String(grade).trim();
   const clean = str.replace(/\s*\(.*?\)/g, '').replace(/grade/i, '').trim();
-  return clean || str || 'A';
+  return clean || str;
+}
+
+function normalizeSearchValue(value) {
+  return String(value == null ? '' : value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function getResultPoints(result) {
+  if (!result) return 0;
+  const explicit = [result.totalPoints, result.points, result.score]
+    .find(value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value)));
+  if (explicit !== undefined) return Number(explicit);
+  return (Number(result.gradePoints) || 0) + (Number(result.positionPoints) || 0);
+}
+
+function formatOrdinal(position) {
+  const match = String(position == null ? '' : position).match(/\d+/);
+  const value = match ? Number(match[0]) : Number(position);
+  if (!Number.isInteger(value) || value <= 0 || value === 99) return '';
+  const mod100 = value % 100;
+  const suffix = mod100 >= 11 && mod100 <= 13
+    ? 'th'
+    : ({ 1: 'st', 2: 'nd', 3: 'rd' }[value % 10] || 'th');
+  return `${value}${suffix}`;
+}
+
+function getRankText(position) {
+  const ordinal = formatOrdinal(position);
+  return ordinal ? `${ordinal} Rank` : 'Result Published';
+}
+
+function getProgramMaximumMarks(prog) {
+  prog = prog || {};
+  const explicitMaximum = Number(prog.maxMarks ?? prog.maximumMarks ?? prog.baseMarks ?? prog.totalMarks);
+  if (Number.isFinite(explicitMaximum) && explicitMaximum > 0) return explicitMaximum;
+
+  const templateMaximum = template => Math.max(0, ...(template?.values || []).map(value => Number(value.points) || 0));
+  const gradeTemplateId = prog.gradeTemplateId || prog.gradeTemplate;
+  const positionTemplateId = prog.positionTemplateId || prog.positionTemplate;
+  const gradeMaximum = prog.enableGrading === false ? 0 : templateMaximum(allGradeTemplates.find(t => t.id === gradeTemplateId));
+  const positionMaximum = prog.enableScoring === false ? 0 : templateMaximum(allPositionTemplates.find(t => t.id === positionTemplateId));
+  return gradeMaximum + positionMaximum || 8;
+}
+
+function getCandidateScorePercentage(candidate, winner, obtainedMarks) {
+  const norm = value => String(value == null ? '' : value).trim().toLowerCase();
+  const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
+  const candId = norm(candidate?.id || candidate?.candidateId || winner?.candidateId);
+  const candChest = digits(candidate?.chestNo || candidate?.chest || winner?.chestNo || winner?.chest);
+  const candName = norm(candidate?.name || candidate?.candidateName || winner?.candidateName || winner?.name);
+  const programs = new Map();
+  const addProgram = prog => {
+    if (!prog || norm(prog.type || 'individual') !== 'individual') return;
+    programs.set(norm(prog.id || prog.code || prog.name), prog);
+  };
+
+  allRegistrations.forEach(reg => {
+    const ids = Array.isArray(reg.candidateIds) ? reg.candidateIds : [reg.candidateId].filter(Boolean);
+    const chests = Array.isArray(reg.chestNumbers) ? reg.chestNumbers : [reg.chestNo || reg.chest].filter(Boolean);
+    const names = Array.isArray(reg.candidateNames) ? reg.candidateNames : [reg.candidateName || reg.name].filter(Boolean);
+    const matches = (candId && ids.some(id => norm(id) === candId)) ||
+      (candChest && chests.some(chest => digits(chest) === candChest)) ||
+      (candName && names.some(name => norm(name) === candName));
+    if (!matches) return;
+    addProgram(allPrograms.find(p =>
+      (reg.programId && String(p.id) === String(reg.programId)) ||
+      (reg.programCode && norm(p.code) === norm(reg.programCode)) ||
+      (reg.programName && norm(p.name) === norm(reg.programName))
+    ));
+  });
+
+  const explicitPrograms = candidate?.programs || candidate?.registeredPrograms || candidate?.events || [];
+  if (Array.isArray(explicitPrograms)) explicitPrograms.forEach(ref => {
+    const item = typeof ref === 'object' && ref !== null ? ref : { id: ref, code: ref, name: ref };
+    addProgram(allPrograms.find(p =>
+      (item.id && String(p.id) === String(item.id)) ||
+      (item.programId && String(p.id) === String(item.programId)) ||
+      ((item.code || item.programCode) && norm(p.code) === norm(item.code || item.programCode)) ||
+      ((item.name || item.programName) && norm(p.name) === norm(item.name || item.programName))
+    ));
+  });
+
+  allPrograms.forEach(prog => {
+    if (Array.isArray(prog.winners) && prog.winners.some(w =>
+      (candId && norm(w.candidateId) === candId) ||
+      (candChest && digits(w.chestNo || w.chest) === candChest) ||
+      (candName && norm(w.candidateName) === candName)
+    )) addProgram(prog);
+  });
+
+  const maximumMarks = Array.from(programs.values()).reduce((sum, prog) => sum + getProgramMaximumMarks(prog), 0);
+  return maximumMarks > 0 ? Math.min(100, (Number(obtainedMarks) || 0) / maximumMarks * 100) : 0;
 }
 
 // Stage 1 (resultsPublished) sends a result to the admin printing workflow.
@@ -626,18 +842,22 @@ function processDataAndRender() {
     const matchingResults = allResults.filter(r => r.programId === prog.id || r.programCode === prog.code);
     prog.isPublished = isPublicResultPublished(prog);
     
-    if (matchingResults.length > 0) {
-      prog.winners = matchingResults.map(r => ({
+    prog.winners = matchingResults.map(r => {
+      const matchedCandidate = allCandidates.find(candidate =>
+        (r.candidateId && String(candidate.id || candidate.candidateId || '') === String(r.candidateId)) ||
+        ((r.chestNo || r.chest) && String(candidate.chestNo || candidate.chest || '') === String(r.chestNo || r.chest))
+      );
+      return {
         position: getNumericPosition(r),
-        candidateName: r.candidateName || r.name || 'Candidate',
-        candidateId: r.candidateId || r.code || '',
-        chestNo: r.chestNo || '',
-        team: r.team || r.teamName || 'Unassigned',
+        candidateName: r.candidateName || r.name || matchedCandidate?.name || matchedCandidate?.candidateName || 'Candidate',
+        candidateId: r.candidateId || matchedCandidate?.id || '',
+        chestNo: r.chestNo || r.chest || matchedCandidate?.chestNo || matchedCandidate?.chest || '',
+        team: r.team || r.teamName || matchedCandidate?.team || matchedCandidate?.teamName || 'Unassigned',
         grade: parseGradeLabel(r.gradeLabel || r.grade),
-        points: parseInt(r.totalPoints || r.points || (parseInt(r.gradePoints || 0) + parseInt(r.positionPoints || 0))) || 0,
+        points: getResultPoints(r),
         isGroupResult: r.isGroupResult === true
-      })).sort((a, b) => a.position - b.position);
-    }
+      };
+    }).sort((a, b) => a.position - b.position || b.points - a.points || a.candidateName.localeCompare(b.candidateName));
   });
 
   calculateTeamStandings();
@@ -649,6 +869,7 @@ function processDataAndRender() {
   renderDashboardView();
   startDashboardCycle();
   renderViews();
+  if (authenticatedCandidate) renderAuthenticatedCandidateView(authenticatedCandidate);
 }
 
 function calculateTeamStandings() {
@@ -701,11 +922,12 @@ function renderSectionDropdown() {
   if (!sectionSelect) return;
 
   const sectionsToDisplay = getCreatedSectionsList();
-  const currentVal = sectionSelect.value || 'ALL';
+  const currentVal = activeSection || 'ALL';
+  const normalizedCurrent = normalizeSearchValue(currentVal);
 
   let html = `<option value="ALL" ${currentVal === 'ALL' ? 'selected' : ''}>All Sections</option>`;
   sectionsToDisplay.forEach(sec => {
-    html += `<option value="${sec}" ${currentVal === sec ? 'selected' : ''}>${sec}</option>`;
+    html += `<option value="${sec}" ${normalizedCurrent === normalizeSearchValue(sec) ? 'selected' : ''}>${sec}</option>`;
   });
 
   sectionSelect.innerHTML = html;
@@ -1149,15 +1371,20 @@ function renderViews() {
 
     if (!matchesActiveProgramType(prog)) return false;
 
-    const progSec = (prog.category || prog.section || '').toUpperCase();
-    if (activeSection !== 'ALL' && progSec !== activeSection.toUpperCase()) return false;
+    const progSec = normalizeSearchValue(prog.category || prog.section);
+    if (activeSection !== 'ALL' && progSec !== normalizeSearchValue(activeSection)) return false;
 
     if (searchQuery) {
-      const nameMatch = (prog.name || '').toLowerCase().includes(searchQuery);
-      const codeMatch = (prog.code || '').toLowerCase().includes(searchQuery);
+      const query = normalizeSearchValue(searchQuery);
+      const nameMatch = normalizeSearchValue(prog.name).includes(query);
+      const codeMatch = normalizeSearchValue(prog.code).includes(query);
       const winnerMatch = Array.isArray(prog.winners) && prog.winners.some(w =>
-        (w.candidateName || '').toLowerCase().includes(searchQuery) ||
-        (w.team || '').toLowerCase().includes(searchQuery)
+        [w.candidateName, w.chestNo, w.candidateId, w.team].some(value => normalizeSearchValue(value).includes(query)) ||
+        Boolean(w.candidateId) && allCandidates.some(candidate =>
+          String(candidate.id || candidate.candidateId || '') === String(w.candidateId || '') &&
+          [candidate.name, candidate.candidateName, candidate.chestNo, candidate.chest, candidate.team]
+            .some(value => normalizeSearchValue(value).includes(query))
+        )
       );
       return nameMatch || codeMatch || winnerMatch;
     }
@@ -1419,62 +1646,120 @@ function renderAuthenticatedCandidateView(cand) {
   if (teamEl) teamEl.textContent = cand.team || 'Unassigned';
   if (secEl) secEl.textContent = cand.section || 'General';
 
-  // Calculate results for this candidate
+  // Build the candidate's complete event list from registrations first, then
+  // enrich it with result data. This keeps unjudged/non-winning events visible.
   let totalPts = 0;
-  let winsCount = 0;
-  let candResults = [];
+  let publishedCount = 0;
+  const candidateEvents = new Map();
+  const norm = value => String(value == null ? '' : value).trim().toLowerCase();
+  const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
+  const candId = norm(cand.id || cand.candidateId);
+  const candChest = digits(cand.chestNo || cand.chest);
+  const candName = norm(cand.name || cand.candidateName);
+
+  const registrationMatchesCandidate = reg => {
+    const ids = Array.isArray(reg.candidateIds) ? reg.candidateIds : [reg.candidateId].filter(Boolean);
+    const chests = Array.isArray(reg.chestNumbers) ? reg.chestNumbers : [reg.chestNo || reg.chest].filter(Boolean);
+    const names = Array.isArray(reg.candidateNames) ? reg.candidateNames : [reg.candidateName || reg.name].filter(Boolean);
+    return (candId && ids.some(id => norm(id) === candId)) ||
+      (candChest && chests.some(chest => digits(chest) === candChest)) ||
+      (candName && names.some(name => norm(name) === candName));
+  };
+
+  const programKey = prog => norm(prog.id || prog.code || prog.name);
+  const addEvent = (prog, fallback = {}) => {
+    if (!prog && !fallback.programId && !fallback.programCode && !fallback.programName) return null;
+    const data = prog || {};
+    const key = programKey(data) || norm(fallback.programId || fallback.programCode || fallback.programName);
+    if (!key) return null;
+    if (!candidateEvents.has(key)) {
+      candidateEvents.set(key, {
+        program: data,
+        programName: data.name || fallback.programName || fallback.name || 'Untitled Program',
+        programCode: data.code || fallback.programCode || fallback.code || data.id || '',
+        category: data.category || data.section || fallback.category || fallback.section || cand.section || 'General',
+        isPublished: data.isPublished === true,
+        result: null
+      });
+    }
+    return candidateEvents.get(key);
+  };
+
+  allRegistrations.filter(registrationMatchesCandidate).forEach(reg => {
+    const prog = allPrograms.find(p =>
+      (reg.programId && (String(p.id) === String(reg.programId) || String(p.progId || '') === String(reg.programId))) ||
+      (reg.programCode && norm(p.code) === norm(reg.programCode)) ||
+      (reg.programName && norm(p.name) === norm(reg.programName))
+    );
+    addEvent(prog, reg);
+  });
+
+  const explicitPrograms = cand.programs || cand.registeredPrograms || cand.events || [];
+  if (Array.isArray(explicitPrograms)) {
+    explicitPrograms.forEach(item => {
+      const ref = typeof item === 'object' && item !== null ? item : { programId: item, programCode: item, programName: item };
+      const prog = allPrograms.find(p =>
+        (ref.programId && String(p.id) === String(ref.programId)) ||
+        (ref.id && String(p.id) === String(ref.id)) ||
+        (ref.programCode && norm(p.code) === norm(ref.programCode)) ||
+        (ref.code && norm(p.code) === norm(ref.code)) ||
+        (ref.programName && norm(p.name) === norm(ref.programName)) ||
+        (ref.name && norm(p.name) === norm(ref.name))
+      );
+      addEvent(prog, ref);
+    });
+  }
 
   allPrograms.forEach(prog => {
     if (Array.isArray(prog.winners)) {
       const match = prog.winners.find(w =>
-        w.candidateId === cand.id ||
-        String(w.chestNo || '') === String(cand.chestNo || '') ||
-        (w.candidateName || '').toLowerCase() === (cand.name || '').toLowerCase()
+        (candId && norm(w.candidateId) === candId) ||
+        (candChest && digits(w.chestNo || w.chest) === candChest) ||
+        (candName && norm(w.candidateName || w.name) === candName)
       );
       if (match) {
+        const event = addEvent(prog);
         if (prog.isPublished) {
           totalPts += (match.points || 0);
-          if (match.position === 1) winsCount += 1;
+          publishedCount += 1;
         }
-        candResults.push({
-          programName: prog.name,
-          programCode: prog.code,
-          category: prog.category || prog.section,
-          position: match.position,
-          grade: match.grade,
-          points: match.points,
-          isPublished: prog.isPublished === true
-        });
+        if (event) {
+          event.isPublished = prog.isPublished === true;
+          event.result = match;
+        }
       }
     }
   });
 
-  // Calculate total participations count for candidate
-  let totalParticipations = candResults.length;
-  if (Array.isArray(cand.programs)) {
-    totalParticipations = Math.max(totalParticipations, cand.programs.length);
-  } else if (cand.eventCount) {
-    totalParticipations = Math.max(totalParticipations, cand.eventCount);
-  }
+  const candResults = Array.from(candidateEvents.values());
+  const totalParticipations = Math.max(candResults.length, Number(cand.eventCount) || 0);
 
   const statPts = document.getElementById('cand-stat-points');
   const statWins = document.getElementById('cand-stat-wins');
   const statEvents = document.getElementById('cand-stat-events');
   const statPct = document.getElementById('cand-stat-percentage');
 
-  // Calculate percentage: Total Points / Max Achievable Points (based on participations)
-  const maxPossibleMarks = totalParticipations > 0 ? totalParticipations * 8 : 0;
-  const percentageVal = maxPossibleMarks > 0 ? Math.min(100, Math.round((totalPts / maxPossibleMarks) * 100)) : 0;
+  // Only individual Normal/Starred participations contribute to this percentage.
+  const percentageEvents = candResults.filter(event => {
+    const type = norm(event.program?.type || 'individual');
+    return type === 'individual';
+  });
+  const maximumMarks = percentageEvents.reduce((sum, event) => sum + getProgramMaximumMarks(event.program), 0);
+  const percentageObtainedMarks = percentageEvents.reduce((sum, event) =>
+    sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
+  const percentageVal = maximumMarks > 0
+    ? Math.min(100, (percentageObtainedMarks / maximumMarks) * 100)
+    : 0;
 
   if (statEvents) statEvents.textContent = `${totalParticipations} Events`;
-  if (statWins) statWins.textContent = `${winsCount} Published`;
+  if (statWins) statWins.textContent = `${publishedCount} Published`;
   if (statPts) statPts.textContent = `${totalPts} Marks`;
-  if (statPct) statPct.textContent = `${percentageVal}%`;
+  if (statPct) statPct.textContent = `${percentageVal.toFixed(1)}%`;
 
   const listContainer = document.getElementById('cand-results-list');
   if (listContainer) {
     if (candResults.length === 0) {
-      listContainer.innerHTML = `<div class="p-6 text-center bg-slate-50 border border-slate-200 rounded-xl text-slate-400 font-normal text-xs">No declared program results found for candidate #${cand.chestNo || ''}.</div>`;
+      listContainer.innerHTML = `<div class="p-6 text-center bg-slate-50 border border-slate-200 rounded-xl text-slate-400 font-normal text-xs">No registered programs found for candidate #${cand.chestNo || ''}.</div>`;
     } else {
       listContainer.innerHTML = candResults.map(r => `
         <div class="p-3.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
@@ -1484,11 +1769,11 @@ function renderAuthenticatedCandidateView(cand) {
             <p class="text-[11px] font-mono font-normal text-slate-400">Code: #${r.programCode}</p>
           </div>
           <div class="text-right">
-            ${r.isPublished ? `
-              <span class="px-2.5 py-0.5 bg-amber-50 text-amber-950 font-medium text-xs rounded-full border border-amber-200">
-                ${r.position === 1 ? '1st Rank' : r.position === 2 ? '2nd Rank' : '3rd Rank'} (Grade ${r.grade})
+            ${r.isPublished && r.result ? `
+              <span class="result-rank-badge px-2.5 py-0.5 font-medium text-xs rounded-full border">
+                ${getRankText(r.result.position)}${r.result.grade ? ` (Grade ${r.result.grade})` : ''}
               </span>
-              <span class="block text-xs font-medium text-slate-900 mt-1">+${r.points} Pts</span>
+              <span class="block text-xs font-medium text-slate-900 mt-1">+${r.result.points || 0} Pts</span>
             ` : `
               <span class="px-2.5 py-0.5 bg-slate-100 text-slate-500 font-medium text-xs rounded-full border border-slate-200">
                 Result not published
@@ -1639,7 +1924,23 @@ function renderCandidateToppers() {
     }
   });
 
-  const overallToppers = Object.values(candidateMap).sort((a, b) => b.points - a.points);
+  const attachScorePercentage = entry => {
+    const candidate = allCandidates.find(c =>
+      (c.id && c.id === entry.winnerObj?.candidateId) ||
+      (c.chestNo && String(c.chestNo) === String(entry.winnerObj?.chestNo)) ||
+      (c.name && c.name.toLowerCase() === (entry.name || '').toLowerCase())
+    );
+    return {
+      ...entry,
+      matchedCandidate: candidate,
+      scorePercentage: getCandidateScorePercentage(candidate, entry.winnerObj, entry.points)
+    };
+  };
+
+  const percentageFirst = (a, b) =>
+    b.scorePercentage - a.scorePercentage || b.points - a.points || a.name.localeCompare(b.name);
+
+  const overallToppers = Object.values(candidateMap).map(attachScorePercentage).sort(percentageFirst);
 
   if (overallToppers.length === 0) {
     container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs font-medium">No candidate results available yet.</div>`;
@@ -1648,11 +1949,7 @@ function renderCandidateToppers() {
   }
 
   const collegeTopper = overallToppers[0];
-  let matchedCand = allCandidates.find(c =>
-    (c.id && c.id === collegeTopper.winnerObj?.candidateId) ||
-    (c.chestNo && String(c.chestNo) === String(collegeTopper.winnerObj?.chestNo)) ||
-    (c.name && c.name.toLowerCase() === (collegeTopper.name || '').toLowerCase())
-  );
+  let matchedCand = collegeTopper.matchedCandidate;
 
   let totalParticipations = collegeTopper.winsCount;
   let chestNo = collegeTopper.winnerObj?.chestNo || 'N/A';
@@ -1664,8 +1961,7 @@ function renderCandidateToppers() {
     if (matchedCand.chestNo) chestNo = matchedCand.chestNo;
   }
 
-  const maxPossibleMarks = totalParticipations * 8;
-  const percentageVal = maxPossibleMarks > 0 ? Math.min(100, Math.round((collegeTopper.points / maxPossibleMarks) * 100)) : 0;
+  const percentageVal = getCandidateScorePercentage(matchedCand, collegeTopper.winnerObj, collegeTopper.points);
 
   const photoUrl = getCandidatePhotoUrl(collegeTopper.winnerObj, matchedCand);
   const initials = getInitials(collegeTopper.name);
@@ -1702,7 +1998,7 @@ function renderCandidateToppers() {
           <span class="text-[9px] font-medium text-amber-700/70 uppercase">Total Pts</span>
         </div>
         <div class="text-center sm:text-right bg-white/80 px-3 py-1.5 rounded-xl border border-sky-100 min-w-[70px]">
-          <span class="block text-xl font-medium text-sky-600 leading-none">${percentageVal}%</span>
+          <span class="block text-xl font-medium text-sky-600 leading-none">${percentageVal.toFixed(1)}%</span>
           <span class="text-[9px] font-medium text-sky-700/70 uppercase">Score</span>
         </div>
       </div>
@@ -1736,15 +2032,11 @@ function renderCandidateToppers() {
       return;
     }
 
-    const secCands = Object.values(sectionData.candidates).sort((a, b) => b.points - a.points);
+    const secCands = Object.values(sectionData.candidates).map(attachScorePercentage).sort(percentageFirst);
     const topCand = secCands[0];
     sectionTopperCount++;
     
-    let sMatchedCand = allCandidates.find(c =>
-      (c.id && c.id === topCand.winnerObj?.candidateId) ||
-      (c.chestNo && String(c.chestNo) === String(topCand.winnerObj?.chestNo)) ||
-      (c.name && c.name.toLowerCase() === (topCand.name || '').toLowerCase())
-    );
+    let sMatchedCand = topCand.matchedCandidate;
     
     let sTotalParticipations = topCand.winsCount;
     let sChestNo = topCand.winnerObj?.chestNo || 'N/A';
@@ -1755,8 +2047,7 @@ function renderCandidateToppers() {
       if (sMatchedCand.chestNo) sChestNo = sMatchedCand.chestNo;
     }
     
-    const sMaxPossibleMarks = sTotalParticipations * 8;
-    const sPercentageVal = sMaxPossibleMarks > 0 ? Math.min(100, Math.round((topCand.points / sMaxPossibleMarks) * 100)) : 0;
+    const sPercentageVal = topCand.scorePercentage;
     
     const sPhotoUrl = getCandidatePhotoUrl(topCand.winnerObj, sMatchedCand);
     const sInitials = getInitials(topCand.name);
@@ -1785,7 +2076,7 @@ function renderCandidateToppers() {
             <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Total Pts</span>
           </div>
           <div class="text-center sm:text-right">
-            <span class="block text-xl font-medium text-sky-600 leading-none">${sPercentageVal}%</span>
+            <span class="block text-xl font-medium text-sky-600 leading-none">${sPercentageVal.toFixed(1)}%</span>
             <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Score</span>
           </div>
         </div>
@@ -1849,8 +2140,8 @@ window.openProgramModal = function (programId) {
       `;
     } else {
       listEl.innerHTML = prog.winners.map(w => {
-        const rankText = w.position === 1 ? '1st Rank' : w.position === 2 ? '2nd Rank' : w.position === 3 ? '3rd Rank' : `${w.position}th Rank`;
-        const rankColor = w.position === 1 ? 'bg-amber-500 text-white border-amber-600' : w.position === 2 ? 'bg-slate-700 text-white border-slate-800' : w.position === 3 ? 'bg-rose-600 text-white border-rose-700' : 'bg-slate-100 text-slate-700 border-slate-300';
+        const rankText = getRankText(w.position);
+        const rankNumber = Number((String(w.position == null ? '' : w.position).match(/\d+/) || [0])[0]);
 
         const matchedCand = allCandidates.find(c =>
           (c.id && c.id === w.candidateId) ||
@@ -1870,7 +2161,7 @@ window.openProgramModal = function (programId) {
         return `
           <div class="p-4 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-4 flex-wrap">
             <div class="flex items-center gap-3.5 min-w-0">
-              <span class="px-3 py-1.5 rounded-xl font-medium text-xs flex items-center justify-center shrink-0 border shadow-sm ${rankColor}">
+              <span class="result-rank-badge ${rankNumber >= 1 && rankNumber <= 3 ? `rank-${rankNumber}` : ''}">
                 ${rankText}
               </span>
               ${avatarHtml}
@@ -1882,7 +2173,7 @@ window.openProgramModal = function (programId) {
 
             <div class="flex items-center gap-3 shrink-0">
               <span class="px-3 py-1 rounded-lg bg-amber-50 text-amber-950 font-medium text-xs border border-amber-200">
-                Grade ${w.grade || 'A'}
+                ${w.grade ? `Grade ${w.grade}` : 'No Grade'}
               </span>
               <span class="text-sm font-medium text-slate-900 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm">
                 +${w.points} Pts
@@ -2095,9 +2386,9 @@ function renderDashboardPodium() {
     return;
   }
 
-  const first = winnersList.find(w => w.position === 1) || winnersList[0];
-  const second = winnersList.find(w => w.position === 2) || winnersList[1];
-  const third = winnersList.find(w => w.position === 3) || winnersList[2];
+  const first = winnersList.find(w => w.position === 1);
+  const second = winnersList.find(w => w.position === 2);
+  const third = winnersList.find(w => w.position === 3);
 
   const firstCand = allCandidates.find(c => first && ((c.id && c.id === first.candidateId) || (c.chestNo && String(c.chestNo) === String(first.chestNo)) || (c.name && c.name.toLowerCase() === (first.candidateName || '').toLowerCase())));
   const secondCand = allCandidates.find(c => second && ((c.id && c.id === second.candidateId) || (c.chestNo && String(c.chestNo) === String(second.chestNo)) || (c.name && c.name.toLowerCase() === (second.candidateName || '').toLowerCase())));
@@ -2105,18 +2396,18 @@ function renderDashboardPodium() {
 
   const firstName = first ? (first.candidateName || first.name || 'Candidate') : '-';
   const firstTeam = first ? (first.team || '') : '';
-  const firstGrade = first && first.candidateName && first.candidateName !== '-' ? (first.grade || 'A') : null;
-  const firstPts = first && first.candidateName && first.candidateName !== '-' && first.points ? first.points : null;
+  const firstGrade = first && first.candidateName && first.candidateName !== '-' ? (first.grade || null) : null;
+  const firstPts = first && first.candidateName && first.candidateName !== '-' ? first.points : null;
 
   const secondName = second ? (second.candidateName || second.name || 'Candidate') : '-';
   const secondTeam = second ? (second.team || '') : '';
-  const secondGrade = second && second.candidateName && second.candidateName !== '-' ? (second.grade || 'A') : null;
-  const secondPts = second && second.candidateName && second.candidateName !== '-' && second.points ? second.points : null;
+  const secondGrade = second && second.candidateName && second.candidateName !== '-' ? (second.grade || null) : null;
+  const secondPts = second && second.candidateName && second.candidateName !== '-' ? second.points : null;
 
   const thirdName = third ? (third.candidateName || third.name || 'Candidate') : '-';
   const thirdTeam = third ? (third.team || '') : '';
-  const thirdGrade = third && third.candidateName && third.candidateName !== '-' ? (third.grade || 'A') : null;
-  const thirdPts = third && third.candidateName && third.candidateName !== '-' && third.points ? third.points : null;
+  const thirdGrade = third && third.candidateName && third.candidateName !== '-' ? (third.grade || null) : null;
+  const thirdPts = third && third.candidateName && third.candidateName !== '-' ? third.points : null;
 
   container.innerHTML = `
     <!-- 2nd Place (Left) -->
