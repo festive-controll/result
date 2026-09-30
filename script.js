@@ -749,10 +749,13 @@ function normalizeSearchValue(value) {
 
 function getResultPoints(result) {
   if (!result) return 0;
-  const explicit = [result.totalPoints, result.points, result.score]
-    .find(value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value)));
-  if (explicit !== undefined) return Number(explicit);
-  return (Number(result.gradePoints) || 0) + (Number(result.positionPoints) || 0);
+  const validNumber = value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value));
+  if (validNumber(result.gradePoints) || validNumber(result.positionPoints)) {
+    return (Number(result.gradePoints) || 0) + (Number(result.positionPoints) || 0);
+  }
+  if (validNumber(result.totalPoints)) return Number(result.totalPoints);
+  // Raw judge `score` is not a festival/house point value.
+  return validNumber(result.points) ? Number(result.points) : 0;
 }
 
 function formatOrdinal(position) {
@@ -794,10 +797,14 @@ function findProgramFromReference(ref) {
   const refCode = data.programCode ?? data.code;
   const refName = data.programName ?? data.name;
   if (refId != null && String(refId).trim()) {
-    return allPrograms.find(program =>
+    const idMatch = allPrograms.find(program =>
       String(program.id) === String(refId) ||
       (program.progId != null && String(program.progId) === String(refId))
     ) || null;
+    if (idMatch) return idMatch;
+    // Some legacy registration/result rows retained an obsolete document ID.
+    // Continue with the guarded code/name + section lookup below instead of
+    // losing the correct canonical program altogether.
   }
 
   const refSection = normalizeSearchValue(data.category ?? data.section);
@@ -817,8 +824,11 @@ function findProgramFromReference(ref) {
 function resultBelongsToProgram(result, program) {
   const resultProgramId = result?.programId ?? result?.progId;
   if (resultProgramId != null && String(resultProgramId).trim()) {
-    return String(resultProgramId) === String(program.id) ||
+    const idMatches = String(resultProgramId) === String(program.id) ||
       (program.progId != null && String(resultProgramId) === String(program.progId));
+    if (idMatches) return true;
+    // Fall through only to the strict legacy identity check. This repairs
+    // stale IDs without allowing a code shared by two sections to cross-link.
   }
 
   const resultCode = normalizeSearchValue(result?.programCode || result?.code);
@@ -839,14 +849,36 @@ function programIdentity(program, fallback = {}) {
   const code = data.code ?? fallback.programCode ?? fallback.code;
   const name = data.name ?? fallback.programName ?? fallback.name;
   if (id != null && String(id).trim()) return `id:${String(id).trim()}`;
-  if (code && normalizeSearchValue(code)) return `code:${normalizeSearchValue(code)}`;
-  if (name && normalizeSearchValue(name)) return `name:${normalizeSearchValue(name)}`;
+  const section = data.category ?? data.section ?? fallback.category ?? fallback.section;
+  const sectionKey = normalizeSearchValue(section);
+  if (code && normalizeSearchValue(code)) return `code:${normalizeSearchValue(code)}|section:${sectionKey}`;
+  if (name && normalizeSearchValue(name)) return `name:${normalizeSearchValue(name)}|section:${sectionKey}`;
   return '';
 }
 
 function isIndividualProgram(program) {
-  const type = normalizeSearchValue(program?.type || program?.programType || 'individual');
-  return type !== 'group' && !type.includes('group');
+  if (!program) return false;
+  const type = normalizeSearchValue(
+    program.type || program.programType || program.participationType || program.entryType || 'individual'
+  );
+  const section = normalizeSearchValue(program.category || program.section);
+  const hasGroupConfiguration =
+    (Number(program.groupSetsCount) || 0) > 0 ||
+    (Number(program.groupParticipantsPerSet) || 0) > 0;
+  // Some older/misconfigured program documents say "Individual" even though
+  // their judging records were saved as team/group results. Treat the result
+  // shape as authoritative so a member chest number cannot expose that group
+  // program on an individual candidate profile.
+  const hasGroupResults = allResults.some(result =>
+    resultBelongsToProgram(result, program) &&
+    (result.isGroupResult === true || result.isGeneralResult === true)
+  );
+  const isGroup = type.includes('group') || type.includes('team') ||
+    program.isGroup === true || program.groupProgram === true ||
+    hasGroupConfiguration || hasGroupResults;
+  const isGeneralHouseProgram = section === 'general' || section === 'kulliya' ||
+    type.includes('general') || type.includes('house');
+  return !isGroup && !isGeneralHouseProgram;
 }
 
 function isStarredGradeProgram(program) {
@@ -918,19 +950,22 @@ function processDataAndRender() {
     prog.isPublished = isPublicResultPublished(prog);
     
     prog.winners = matchingResults.map(r => {
+      const individualAward = isIndividualProgram(prog) && r.isGroupResult !== true;
       const matchedCandidate = allCandidates.find(candidate =>
         (r.candidateId && String(candidate.id || candidate.candidateId || '') === String(r.candidateId)) ||
         ((r.chestNo || r.chest) && String(candidate.chestNo || candidate.chest || '') === String(r.chestNo || r.chest))
       );
       return {
         position: getNumericPosition(r),
-        candidateName: r.candidateName || r.name || matchedCandidate?.name || matchedCandidate?.candidateName || 'Candidate',
-        candidateId: r.candidateId || matchedCandidate?.id || '',
-        chestNo: r.chestNo || r.chest || matchedCandidate?.chestNo || matchedCandidate?.chest || '',
+        candidateName: individualAward
+          ? (r.candidateName || r.name || matchedCandidate?.name || matchedCandidate?.candidateName || 'Candidate')
+          : (r.team || r.teamName || r.house || 'House'),
+        candidateId: individualAward ? (r.candidateId || matchedCandidate?.id || '') : '',
+        chestNo: individualAward ? (r.chestNo || r.chest || matchedCandidate?.chestNo || matchedCandidate?.chest || '') : '',
         team: r.team || r.teamName || matchedCandidate?.team || matchedCandidate?.teamName || 'Unassigned',
         grade: parseGradeLabel(r.gradeLabel || r.grade),
         points: getResultPoints(r),
-        isGroupResult: r.isGroupResult === true
+        isGroupResult: !individualAward
       };
     }).sort((a, b) => a.position - b.position || b.points - a.points || a.candidateName.localeCompare(b.candidateName));
   });
@@ -1024,9 +1059,9 @@ function renderCategoryToppersGrid() {
     const candidateMap = {};
     catProgs.forEach(p => {
       const isKulliyaSection = secName.toUpperCase() === 'KULLIYA';
-      const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+      const isGroup = !isIndividualProgram(p);
       
-      if (isGroup && !isKulliyaSection) return; // Exclude group programs from individual toppers
+      if (isGroup) return; // House/group/general marks never create an individual topper.
       if (Array.isArray(p.winners)) {
         p.winners.forEach(w => {
           if (w.isGroupResult && !isKulliyaSection) return;
@@ -1137,9 +1172,9 @@ window.openSectionToppersList = function(secName) {
   
   catProgs.forEach(p => {
     const isKulliyaSection = secName.toUpperCase() === 'KULLIYA';
-    const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+    const isGroup = !isIndividualProgram(p);
     
-    if (isGroup && !isKulliyaSection) return;
+    if (isGroup) return;
     if (Array.isArray(p.winners)) {
       p.winners.forEach(w => {
         if (w.isGroupResult && !isKulliyaSection) return;
@@ -1787,26 +1822,28 @@ function renderAuthenticatedCandidateView(cand) {
     }
   });
 
-  // Enrich every registered event from its canonical program. For group events,
-  // the saved result belongs to the team rather than to each candidate.
+  // Enrich only individual events with candidate awards. Group/general results
+  // belong to the house leaderboard and must never be copied to every member.
   candidateEvents.forEach(event => {
     const prog = event.program;
     event.isPublished = prog?.isPublished === true;
     if (!prog || !Array.isArray(prog.winners)) return;
-    event.result = prog.winners.find(w => winnerMatchesCandidate(w, prog)) || (!isIndividualProgram(prog) ? prog.winners.find(w =>
-      norm(w.team || w.teamName) === norm(cand.team || cand.teamName)
-    ) : null) || null;
+    event.result = isIndividualProgram(prog)
+      ? (prog.winners.find(w => !w.isGroupResult && winnerMatchesCandidate(w, prog)) || null)
+      : null;
   });
 
-  // The candidate profile follows the same global Arts/Sports scope as every
-  // other result view. This also keeps all profile totals consistent with the
-  // visible event cards.
+  // An individual candidate profile must contain individual programs only.
+  // Filter the shared list here so the visible cards and every profile total
+  // (including Total Participation) are calculated from the same events.
   const candResults = Array.from(candidateEvents.values())
-    .filter(event => event.program && matchesActiveProgramType(event.program))
+    .filter(event => event.program &&
+      isIndividualProgram(event.program) &&
+      matchesActiveProgramType(event.program))
     .sort((a, b) => String(a.programCode).localeCompare(String(b.programCode), undefined, { numeric: true }));
   publishedCount = candResults.filter(event => event.isPublished).length;
   totalPts = candResults.reduce((sum, event) =>
-    sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
+    sum + (isIndividualProgram(event.program) && event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
   const totalParticipations = candResults.length;
 
   const statPts = document.getElementById('cand-stat-points');
@@ -1814,8 +1851,8 @@ function renderAuthenticatedCandidateView(cand) {
   const statEvents = document.getElementById('cand-stat-events');
   const statPct = document.getElementById('cand-stat-percentage');
 
-  // Only individual Normal/Starred participations contribute to this percentage.
-  const percentageEvents = candResults.filter(event => isIndividualProgram(event.program));
+  // candResults is already restricted to individual Normal/Starred programs.
+  const percentageEvents = candResults;
   const maximumMarks = percentageEvents.reduce((sum, event) => sum + getProgramMaximumMarks(event.program), 0);
   const percentageObtainedMarks = percentageEvents.reduce((sum, event) =>
     sum + (event.isPublished && event.result ? Number(event.result.points) || 0 : 0), 0);
@@ -1958,7 +1995,7 @@ function renderCandidateToppers() {
   allPrograms.filter(matchesActiveProgramType).forEach(p => {
     const section = (p.category || p.section || '').toUpperCase();
     const isKulliyaSection = section === 'KULLIYA';
-    const isGroup = (p.type || '').toLowerCase().includes('group') || isKulliyaSection;
+    const isGroup = !isIndividualProgram(p);
     
     if (p.isPublished && Array.isArray(p.winners)) {
       p.winners.forEach(w => {
@@ -1982,8 +2019,7 @@ function renderCandidateToppers() {
 
         // SECTION candidate map
         if (sectionCandidateMap[section]) {
-          if (isGroup && !isKulliyaSection) return;
-          if (w.isGroupResult && !isKulliyaSection) return;
+          if (isGroup || w.isGroupResult) return;
           
           let sKey = w.candidateName;
           let dName = w.candidateName;
@@ -2246,19 +2282,19 @@ window.openProgramModal = function (programId) {
         }
 
         return `
-          <div class="p-4 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-4 flex-wrap">
-            <div class="flex items-center gap-3.5 min-w-0">
+          <div class="detail-winner-card p-4 bg-slate-50/70 border border-slate-200/90 rounded-2xl flex items-center justify-between gap-4 flex-wrap">
+            <div class="detail-winner-main flex items-center gap-3.5 min-w-0">
               <span class="result-rank-badge ${rankNumber >= 1 && rankNumber <= 3 ? `rank-${rankNumber}` : ''}">
                 ${rankText}
               </span>
               ${avatarHtml}
-              <div class="min-w-0">
-                <h5 class="font-medium text-slate-900 text-base truncate">${w.candidateName}</h5>
-                <p class="text-xs font-normal text-slate-500 truncate">${w.team || 'Unassigned Team'} ${w.chestNo ? `(#${w.chestNo})` : ''}</p>
+              <div class="detail-winner-copy min-w-0">
+                <h5 class="detail-winner-name font-medium text-slate-900 text-base">${w.candidateName}</h5>
+                <p class="detail-winner-meta text-xs font-normal text-slate-500">${w.team || 'Unassigned Team'} ${w.chestNo ? `(#${w.chestNo})` : ''}</p>
               </div>
             </div>
 
-            <div class="flex items-center gap-3 shrink-0">
+            <div class="detail-winner-awards flex items-center gap-3 shrink-0">
               <span class="px-3 py-1 rounded-lg bg-amber-50 text-amber-950 font-medium text-xs border border-amber-200">
                 ${w.grade ? `Grade ${w.grade}` : 'No Grade'}
               </span>
