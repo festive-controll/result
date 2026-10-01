@@ -920,7 +920,7 @@ function isStarredGradeProgram(program) {
   return firstWord === 'starred';
 }
 
-function getCandidateScorePercentage(candidate, winner, obtainedMarks, details = null) {
+function getCandidateIndividualParticipationCount(candidate, winner) {
   const norm = value => String(value == null ? '' : value).trim().toLowerCase();
   const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
   const candId = norm(candidate?.id || candidate?.candidateId || winner?.candidateId);
@@ -928,9 +928,8 @@ function getCandidateScorePercentage(candidate, winner, obtainedMarks, details =
   const candName = norm(candidate?.name || candidate?.candidateName || winner?.candidateName || winner?.name);
   const programs = new Map();
   const addProgram = prog => {
-    // A topper score is point efficiency for the currently selected program
-    // type. Unrelated sports/arts and group registrations must not increase
-    // the denominator.
+    // Only individual registrations in the selected Arts/Sports view count.
+    // Group, house and unrelated program registrations are excluded.
     if (!prog || !isIndividualProgram(prog) || !matchesActiveProgramType(prog)) return;
     programs.set(programIdentity(prog), prog);
   };
@@ -960,12 +959,16 @@ function getCandidateScorePercentage(candidate, winner, obtainedMarks, details =
     )) addProgram(prog);
   });
 
-  const maximumMarks = Array.from(programs.values()).reduce((sum, prog) => sum + getProgramMaximumMarks(prog), 0);
-  if (details && typeof details === 'object') {
-    details.programCount = programs.size;
-    details.maximumMarks = maximumMarks;
-  }
-  return maximumMarks > 0 ? Math.min(100, (Number(obtainedMarks) || 0) / maximumMarks * 100) : 0;
+  return programs.size;
+}
+
+// Topper selection rewards both marks and individual-event participation.
+// A candidate with the section's highest participation keeps all their marks;
+// other candidates' marks are weighted by their participation ratio.
+function getTopperSelectionScore(totalMarks, participatedProgramsIndividual, highestParticipationIndividual) {
+  const highest = Number(highestParticipationIndividual) || 0;
+  if (highest <= 0) return 0;
+  return (Number(totalMarks) || 0) * (Number(participatedProgramsIndividual) || 0) / highest;
 }
 
 // Stage 1 (resultsPublished) sends a result to the admin printing workflow.
@@ -2057,6 +2060,7 @@ function renderCandidateToppers() {
               candidateMap[cKey] = {
                 name: w.candidateName,
                 team: w.team,
+                section: p.category || p.section || w.category || w.section || '',
                 points: 0,
                 winsCount: 0,
                 winnerObj: w
@@ -2080,7 +2084,7 @@ function renderCandidateToppers() {
           if (!sKey) return;
 
           if (!sectionCandidateMap[section].candidates[sKey]) {
-            sectionCandidateMap[section].candidates[sKey] = { name: dName, team: w.team, points: 0, winsCount: 0, winnerObj: w };
+            sectionCandidateMap[section].candidates[sKey] = { name: dName, team: w.team, section: p.category || p.section || w.category || w.section || '', points: 0, winsCount: 0, winnerObj: w };
           }
           sectionCandidateMap[section].candidates[sKey].points += (w.points || 0);
           sectionCandidateMap[section].candidates[sKey].winsCount += 1;
@@ -2089,31 +2093,59 @@ function renderCandidateToppers() {
     }
   });
 
-  const attachScorePercentage = entry => {
+  const attachParticipation = entry => {
     const candidate = allCandidates.find(c =>
       (c.id && c.id === entry.winnerObj?.candidateId) ||
       (c.chestNo && String(c.chestNo) === String(entry.winnerObj?.chestNo)) ||
       (c.name && c.name.toLowerCase() === (entry.name || '').toLowerCase())
     );
-    const scoreDetails = {};
-    const scorePercentage = getCandidateScorePercentage(candidate, entry.winnerObj, entry.points, scoreDetails);
     return {
       ...entry,
       matchedCandidate: candidate,
-      scorePercentage,
-      eligibleProgramCount: scoreDetails.programCount || 0
+      participatedProgramsIndividual: getCandidateIndividualParticipationCount(candidate, entry.winnerObj)
     };
   };
 
-  // Rank by point efficiency first. If two candidates have the same score,
-  // prefer more points, then the candidate who needed fewer programs.
-  const percentageFirst = (a, b) =>
-    b.scorePercentage - a.scorePercentage ||
+  const withSelectionScores = entries => {
+    const highestBySection = {};
+    entries.forEach(entry => {
+      const sectionKey = normalizeSearchValue(
+        entry.matchedCandidate?.section || entry.matchedCandidate?.category || entry.section || entry.winnerObj?.category || entry.winnerObj?.section
+      );
+      highestBySection[sectionKey] = Math.max(highestBySection[sectionKey] || 0, entry.participatedProgramsIndividual);
+    });
+    // Include every candidate in the section when finding its highest
+    // participation, even when that candidate has not earned marks yet.
+    allCandidates.forEach(candidate => {
+      const sectionKey = normalizeSearchValue(candidate.section || candidate.category);
+      if (!sectionKey || highestBySection[sectionKey] === undefined) return;
+      highestBySection[sectionKey] = Math.max(
+        highestBySection[sectionKey],
+        getCandidateIndividualParticipationCount(candidate, null)
+      );
+    });
+    return entries.map(entry => {
+      const sectionKey = normalizeSearchValue(
+        entry.matchedCandidate?.section || entry.matchedCandidate?.category || entry.section || entry.winnerObj?.category || entry.winnerObj?.section
+      );
+      const highestParticipationIndividual = highestBySection[sectionKey] || 0;
+      return {
+        ...entry,
+        highestParticipationIndividual,
+        selectionScore: getTopperSelectionScore(entry.points, entry.participatedProgramsIndividual, highestParticipationIndividual)
+      };
+    });
+  };
+
+  // Formula: total marks * participated individual programs / the highest
+  // individual participation in that candidate's section.
+  const selectionScoreFirst = (a, b) =>
+    b.selectionScore - a.selectionScore ||
     b.points - a.points ||
-    a.eligibleProgramCount - b.eligibleProgramCount ||
+    b.participatedProgramsIndividual - a.participatedProgramsIndividual ||
     a.name.localeCompare(b.name);
 
-  const overallToppers = Object.values(candidateMap).map(attachScorePercentage).sort(percentageFirst);
+  const overallToppers = withSelectionScores(Object.values(candidateMap).map(attachParticipation)).sort(selectionScoreFirst);
 
   if (overallToppers.length === 0) {
     container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs font-medium">No candidate results available yet.</div>`;
@@ -2124,17 +2156,14 @@ function renderCandidateToppers() {
   const collegeTopper = overallToppers[0];
   let matchedCand = collegeTopper.matchedCandidate;
 
-  let totalParticipations = collegeTopper.winsCount;
   let chestNo = collegeTopper.winnerObj?.chestNo || 'N/A';
   let sectionName = matchedCand?.section || matchedCand?.category || collegeTopper.winnerObj?.category || 'General';
 
   if (matchedCand) {
-    if (Array.isArray(matchedCand.programs)) totalParticipations = Math.max(totalParticipations, matchedCand.programs.length);
-    else if (matchedCand.eventCount) totalParticipations = Math.max(totalParticipations, matchedCand.eventCount);
     if (matchedCand.chestNo) chestNo = matchedCand.chestNo;
   }
 
-  const percentageVal = collegeTopper.scorePercentage;
+  const selectionScore = collegeTopper.selectionScore;
 
   const photoUrl = getCandidatePhotoUrl(collegeTopper.winnerObj, matchedCand);
   const initials = getInitials(collegeTopper.name);
@@ -2171,8 +2200,8 @@ function renderCandidateToppers() {
           <span class="text-[9px] font-medium text-amber-700/70 uppercase">Total Pts</span>
         </div>
         <div class="text-center sm:text-right bg-white/80 px-3 py-1.5 rounded-xl border border-sky-100 min-w-[70px]">
-          <span class="block text-xl font-medium text-sky-600 leading-none">${percentageVal.toFixed(1)}%</span>
-          <span class="text-[9px] font-medium text-sky-700/70 uppercase">Score</span>
+          <span class="block text-xl font-medium text-sky-600 leading-none">${selectionScore.toFixed(1)}</span>
+          <span class="text-[9px] font-medium text-sky-700/70 uppercase">Selection Score</span>
         </div>
       </div>
     </div>
@@ -2205,22 +2234,19 @@ function renderCandidateToppers() {
       return;
     }
 
-    const secCands = Object.values(sectionData.candidates).map(attachScorePercentage).sort(percentageFirst);
+    const secCands = withSelectionScores(Object.values(sectionData.candidates).map(attachParticipation)).sort(selectionScoreFirst);
     const topCand = secCands[0];
     sectionTopperCount++;
     
     let sMatchedCand = topCand.matchedCandidate;
     
-    let sTotalParticipations = topCand.winsCount;
     let sChestNo = topCand.winnerObj?.chestNo || 'N/A';
     
     if (sMatchedCand) {
-      if (Array.isArray(sMatchedCand.programs)) sTotalParticipations = Math.max(sTotalParticipations, sMatchedCand.programs.length);
-      else if (sMatchedCand.eventCount) sTotalParticipations = Math.max(sTotalParticipations, sMatchedCand.eventCount);
       if (sMatchedCand.chestNo) sChestNo = sMatchedCand.chestNo;
     }
     
-    const sPercentageVal = topCand.scorePercentage;
+    const sSelectionScore = topCand.selectionScore;
     
     const sPhotoUrl = getCandidatePhotoUrl(topCand.winnerObj, sMatchedCand);
     const sInitials = getInitials(topCand.name);
@@ -2249,8 +2275,8 @@ function renderCandidateToppers() {
             <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Total Pts</span>
           </div>
           <div class="text-center sm:text-right">
-            <span class="block text-xl font-medium text-sky-600 leading-none">${sPercentageVal.toFixed(1)}%</span>
-            <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Score</span>
+            <span class="block text-xl font-medium text-sky-600 leading-none">${sSelectionScore.toFixed(1)}</span>
+            <span class="text-[9px] font-medium text-slate-400 uppercase mt-1 block">Selection Score</span>
           </div>
         </div>
       </div>
