@@ -758,6 +758,36 @@ function getResultPoints(result) {
   return validNumber(result.points) ? Number(result.points) : 0;
 }
 
+function getCurrentGrade(result, program) {
+  const templateRef = program && (program.gradeTemplateId || program.gradeTemplate);
+  const template = allGradeTemplates.find(item =>
+    String(item.id) === String(templateRef) ||
+    normalizeSearchValue(item.name) === normalizeSearchValue(templateRef)
+  );
+  const values = template ? (template.values || template.grades || template.items || []) : [];
+  const rawMarks = result.gradeMarks ?? result.marks;
+  let matched = null;
+  if (rawMarks !== undefined && rawMarks !== null && rawMarks !== '' && Number.isFinite(Number(rawMarks))) {
+    const numericMarks = Number(rawMarks);
+    const percentage = numericMarks <= 10 ? numericMarks * 10 : numericMarks;
+    matched = values.find(value => {
+      const numbers = String(value.percentage || value.range || '').match(/\d+(?:\.\d+)?/g);
+      if (!numbers || !numbers.length) return false;
+      return percentage >= Number(numbers[0]) &&
+        percentage <= (numbers.length > 1 ? Number(numbers[1]) : Infinity);
+    }) || null;
+  }
+  if (!matched) {
+    const savedLabel = normalizeSearchValue(parseGradeLabel(result.gradeLabel || result.grade));
+    matched = values.find(value =>
+      normalizeSearchValue(parseGradeLabel(value.label || value.grade || value.name)) === savedLabel
+    ) || null;
+  }
+  if (!matched) return { label: parseGradeLabel(result.gradeLabel || result.grade), points: Number(result.gradePoints || 0) };
+  const label = String(matched.label || matched.grade || matched.name || '').trim();
+  return { label, points: /^e(?:\s|\(|$)/i.test(label) ? 0 : Number(matched.points ?? matched.value ?? 0) };
+}
+
 function formatOrdinal(position) {
   const match = String(position == null ? '' : position).match(/\d+/);
   const value = match ? Number(match[0]) : Number(position);
@@ -951,6 +981,7 @@ function processDataAndRender() {
     
     prog.winners = matchingResults.map(r => {
       const individualAward = isIndividualProgram(prog) && r.isGroupResult !== true;
+      const currentGrade = getCurrentGrade(r, prog);
       const matchedCandidate = allCandidates.find(candidate =>
         (r.candidateId && String(candidate.id || candidate.candidateId || '') === String(r.candidateId)) ||
         ((r.chestNo || r.chest) && String(candidate.chestNo || candidate.chest || '') === String(r.chestNo || r.chest))
@@ -963,8 +994,8 @@ function processDataAndRender() {
         candidateId: individualAward ? (r.candidateId || matchedCandidate?.id || '') : '',
         chestNo: individualAward ? (r.chestNo || r.chest || matchedCandidate?.chestNo || matchedCandidate?.chest || '') : '',
         team: r.team || r.teamName || matchedCandidate?.team || matchedCandidate?.teamName || 'Unassigned',
-        grade: parseGradeLabel(r.gradeLabel || r.grade),
-        points: getResultPoints(r),
+        grade: currentGrade.label,
+        points: currentGrade.points + Number(r.positionPoints || 0),
         isGroupResult: !individualAward
       };
     }).sort((a, b) => a.position - b.position || b.points - a.points || a.candidateName.localeCompare(b.candidateName));
@@ -1958,17 +1989,36 @@ function renderStarredPrograms() {
 window.openCandidateProfileByChestNo = function (candidateOrWinnerOrChest) {
   let cand = null;
   if (typeof candidateOrWinnerOrChest === 'object' && candidateOrWinnerOrChest !== null) {
-    cand = allCandidates.find(c =>
-      (c.id && c.id === candidateOrWinnerOrChest.candidateId) ||
-      (c.chestNo && String(c.chestNo) === String(candidateOrWinnerOrChest.chestNo)) ||
-      (c.name && c.name.toLowerCase() === (candidateOrWinnerOrChest.candidateName || candidateOrWinnerOrChest.name || '').toLowerCase())
-    ) || candidateOrWinnerOrChest;
+    const selectedId = candidateOrWinnerOrChest.id || candidateOrWinnerOrChest.candidateId;
+    const selectedChest = candidateOrWinnerOrChest.chestNo || candidateOrWinnerOrChest.chest;
+    const selectedName = candidateOrWinnerOrChest.candidateName || candidateOrWinnerOrChest.name;
+
+    // Resolve strong identifiers before using a name. Different candidates can
+    // legitimately share the same name, so one combined `.find()` may select an
+    // earlier namesake even when the clicked suggestion has an exact ID/chest.
+    if (selectedId != null && String(selectedId).trim()) {
+      cand = allCandidates.find(c =>
+        String(c.id || c.candidateId || '').trim() === String(selectedId).trim()
+      ) || null;
+    }
+    if (!cand && selectedChest != null && String(selectedChest).trim()) {
+      cand = allCandidates.find(c =>
+        String(c.chestNo || c.chest || '').trim() === String(selectedChest).trim()
+      ) || null;
+    }
+    if (!cand && selectedName) {
+      const normalizedName = String(selectedName).trim().toLowerCase();
+      cand = allCandidates.find(c =>
+        String(c.name || c.candidateName || '').trim().toLowerCase() === normalizedName
+      ) || null;
+    }
+    cand = cand || candidateOrWinnerOrChest;
   } else if (candidateOrWinnerOrChest) {
     const searchVal = String(candidateOrWinnerOrChest).trim().toLowerCase();
     cand = allCandidates.find(c =>
       String(c.chestNo || c.chest || '').toLowerCase() === searchVal ||
-      (c.id && c.id === searchVal) ||
-      (c.name && c.name.toLowerCase() === searchVal)
+      String(c.id || c.candidateId || '').trim().toLowerCase() === searchVal ||
+      String(c.name || c.candidateName || '').trim().toLowerCase() === searchVal
     );
   }
 
