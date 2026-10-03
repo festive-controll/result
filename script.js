@@ -750,10 +750,13 @@ function normalizeSearchValue(value) {
 function getResultPoints(result) {
   if (!result) return 0;
   const validNumber = value => value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value));
+  // `totalPoints` is the value committed when the result is published and is
+  // also what the admin candidate page totals. Do not recalculate historical
+  // results from a grade template that may have changed afterward.
+  if (validNumber(result.totalPoints)) return Number(result.totalPoints);
   if (validNumber(result.gradePoints) || validNumber(result.positionPoints)) {
     return (Number(result.gradePoints) || 0) + (Number(result.positionPoints) || 0);
   }
-  if (validNumber(result.totalPoints)) return Number(result.totalPoints);
   // Raw judge `score` is not a festival/house point value.
   return validNumber(result.points) ? Number(result.points) : 0;
 }
@@ -998,7 +1001,7 @@ function processDataAndRender() {
         chestNo: individualAward ? (r.chestNo || r.chest || matchedCandidate?.chestNo || matchedCandidate?.chest || '') : '',
         team: r.team || r.teamName || matchedCandidate?.team || matchedCandidate?.teamName || 'Unassigned',
         grade: currentGrade.label,
-        points: currentGrade.points + Number(r.positionPoints || 0),
+        points: getResultPoints(r),
         isGroupResult: !individualAward
       };
     }).sort((a, b) => a.position - b.position || b.points - a.points || a.candidateName.localeCompare(b.candidateName));
