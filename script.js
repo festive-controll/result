@@ -503,7 +503,7 @@ function fetchResultsData() {
                 <div class="error-logo-box">
                     <img class="error-logo-img" id="offline-logo-img" src="../logo-512.svg" alt="Logo">
                     <div class="error-logo-text">
-                        <div class="error-logo-text-title" id="offline-fest-name">\${d.name || 'Festival'}</div>
+                        <div class="error-logo-text-title" id="offline-fest-name">${d.name || 'Festival'}</div>
                         <div class="error-logo-text-sub">System Lockout</div>
                     </div>
                 </div>
@@ -916,7 +916,7 @@ function isStarredGradeProgram(program) {
   const templateRef = program.gradeTemplateId || program.gradeTemplate || '';
   const template = allGradeTemplates.find(item => String(item.id) === String(templateRef));
   const templateName = template?.name || template?.templateName || template?.title || template?.label || templateRef;
-  const firstWord = normalizeSearchValue(templateName).split(' ')[0].replace(/d+$/, 'd');
+  const firstWord = normalizeSearchValue(templateName).split(' ')[0].replace(/\d+$/, '');
   return firstWord === 'starred';
 }
 
